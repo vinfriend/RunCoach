@@ -50,24 +50,39 @@ elaborada. Si la red falla o tarda, el motor sigue corriendo sin bloquearse
 
 ### RunCoachCore (Swift Package portable)
 
-Sin dependencias de UIKit/SwiftUI/CoreBluetooth/CoreLocation reales — solo
-Foundation. Esto es lo que permite compilarlo y testearlo en Windows.
-Contiene (a implementar en Fase 2/3):
+Sin dependencias de UIKit/SwiftUI/CoreBluetooth/CoreLocation/Combine
+reales — solo Foundation. Esto es lo que permite compilarlo y testearlo en
+Windows.
 
-- **Modelos de dominio**: `HeartRateSample`, `LocationSample`, `RunState`,
-  `Split`, `PaceSample`.
-- **Motor de métricas**: medias móviles, ritmo suavizado, velocidad,
-  distancia, splits, relación ritmo/HR.
-- **Detección de tendencias/eventos**: tasa de cambio de HR, deterioro,
-  recuperación, desviación de objetivo.
-- **Coach Decision Engine**: prioridades, cooldown, deduplicación, contexto
-  reciente, decisión hablar/callarse. La salida más común debe ser "no
-  hablar".
-- **Simulation Engine**: fuente de datos sintética con escenarios
-  reproducibles (ver [docs/testing.md](testing.md)).
+**Implementado (Fase 2):**
+
+- **Modelos de dominio**: `HeartRateSample`, `LocationSample`, `Split`
+  (`Models/`). Timestamps en `TimeInterval` (segundos desde el inicio de la
+  carrera, no `Date`) — determinista y fácil de testear, y es lo que el
+  Simulation Engine (Fase 3) va a poder controlar directamente.
+- **Utilidades de métricas** (`Metrics/`): `MovingAverage` (media móvil
+  genérica de ventana fija), `GeoDistance` (distancia Haversine entre
+  coordenadas), `HeartRateTrend` (clasificación rising/falling/stable con
+  umbral configurable).
+- **`RunState`**: el motor de ingestión — acumula `HeartRateSample`/
+  `LocationSample`, calcula distancia total, ritmo suavizado, FC suavizada,
+  tendencia de FC (comparando el promedio reciente contra el de hace N
+  segundos), y genera `Split`s automáticamente al cruzar el umbral de
+  distancia configurado (1000m por defecto).
 - **Abstracciones de fuente de datos**: protocolos `HeartRateSource` y
-  `LocationSource` que tanto la simulación como el BLE/GPS reales
-  implementan, para que el motor sea agnóstico del origen de los datos.
+  `LocationSource` (`Sources/`) que tanto la simulación (Fase 3) como el
+  BLE/GPS reales (Fases 6-7) van a implementar, para que `RunState` sea
+  agnóstico del origen de los datos.
+
+**Pendiente (fases futuras, explícitamente fuera de alcance de Fase 2):**
+
+- **Simulation Engine** (Fase 3): fuente de datos sintética con escenarios
+  reproducibles (ver [docs/testing.md](testing.md)).
+- **Detección de eventos** más allá de la tendencia de FC: deterioro,
+  recuperación, desviación de objetivo (Fase 8, Run Data Engine completo).
+- **Coach Decision Engine** (Fase 10): prioridades, cooldown, deduplicación,
+  contexto reciente, decisión hablar/callarse. La salida más común debe ser
+  "no hablar".
 
 ### RunCoach-iOS (proyecto Xcode, generado con XcodeGen)
 
@@ -85,12 +100,17 @@ Todo lo específico de Apple:
 ## HeartRateSource: independencia de marca
 
 ```swift
-protocol HeartRateSource {
-    var bpmPublisher: AnyPublisher<HeartRateSample, Never> { get }
+public protocol HeartRateSource: AnyObject {
+    var onSample: ((HeartRateSample) -> Void)? { get set }
     func start()
     func stop()
 }
 ```
+
+Se usa un closure simple en vez de Combine's `AnyPublisher` — Combine es
+exclusivo de plataformas Apple y no existe en el toolchain de Swift para
+Windows/Linux, así que hubiera roto la posibilidad de testear
+`RunCoachCore` fuera de macOS. `LocationSource` sigue el mismo patrón.
 
 Implementaciones previstas:
 

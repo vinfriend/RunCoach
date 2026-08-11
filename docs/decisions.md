@@ -93,3 +93,36 @@ terminal para trabajar en `RunCoachCore` debe correr primero
 `. .\scripts\setup-swift-env.ps1` (ver
 [docs/windows-development.md](windows-development.md)). Documentado ahí en
 detalle para no perder tiempo re-diagnosticando esto.
+
+---
+
+## 2026-08-11 — `HeartRateSource`/`LocationSource` con closures, no Combine
+
+**Decisión**: las abstracciones de fuente de datos en `RunCoachCore` usan
+un closure simple (`onSample: ((Sample) -> Void)?`) en vez de
+`AnyPublisher` de Combine, como se había esbozado inicialmente en
+[docs/architecture.md](architecture.md).
+
+**Motivo**: Combine es exclusivo de plataformas Apple y no está disponible
+en el toolchain de Swift para Windows/Linux. Usarlo hubiera roto el
+objetivo central de que `RunCoachCore` se compile y testee en Windows.
+
+**Alternativas consideradas**: ninguna — es un requisito duro de
+portabilidad, no una preferencia de estilo.
+
+---
+
+## 2026-08-11 — Timestamps como `TimeInterval` relativo, no `Date`
+
+**Decisión**: `HeartRateSample.timestamp` y `LocationSample.timestamp` son
+`TimeInterval` (segundos transcurridos desde el inicio de la carrera), no
+`Date`.
+
+**Motivo**: hace que `RunState` sea determinista y trivial de testear con
+datos sintéticos (sin mockear el reloj del sistema), y es exactamente lo
+que el Simulation Engine (Fase 3) va a necesitar para controlar la
+progresión del tiempo de forma reproducible (ver
+[docs/testing.md](testing.md)).
+
+**Alternativas consideradas**: `Date` — descartado porque acopla los tests
+al reloj real y complica la simulación determinista.

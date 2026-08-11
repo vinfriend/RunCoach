@@ -8,15 +8,15 @@
 
 **Fase 0** (entorno Windows) — **completada**.
 **Fase 1** (arquitectura/investigación) — **completada**.
+**Fase 2** (RunCoachCore: modelos, métricas, `RunState`) — **completada**.
 
-Ambas quedan cerradas a la espera de que Vicente escriba "Continuar con
-Fase 2" para empezar la implementación real de RunCoachCore.
+Fase 3 (Simulation Engine) es la siguiente, a la espera de que Vicente
+confirme para arrancarla.
 
 ## Último commit estable
 
-Ver `git log --oneline -1` — primer commit del repo, incluye toda la
-documentación, el scaffold de `RunCoachCore` y el script de entorno de
-Windows.
+Ver `git log --oneline -1` para el hash exacto. Incluye Fase 0, Fase 1 y
+Fase 2.
 
 ## Entorno Windows
 
@@ -37,11 +37,23 @@ nueva, en [docs/windows-development.md](docs/windows-development.md).
 
 ## Tests en Windows
 
-**`swift build` y `swift test` corren en verde** en `RunCoachCore` (usando
-`scripts/setup-swift-env.ps1` para cargar el entorno de VS + `SDKROOT`).
-Por ahora solo existe un test placeholder (`RunCoachCoreTests.swift`) que
-valida que el toolchain compila y corre — no hay lógica de dominio todavía
-(eso es Fase 2).
+**`swift build` y `swift test` corren en verde**: 22 tests, 0 fallas, en
+`RunCoachCore` (usando `scripts/setup-swift-env.ps1` para cargar el entorno
+de VS + `SDKROOT`). Cobertura actual:
+
+- `MovingAverageTests` (3 tests)
+- `GeoDistanceTests` (3 tests)
+- `HeartRateTrendTests` (4 tests)
+- `RunStateTests` (12 tests): FC suavizada, tendencia de FC (subida y
+  vuelta a estable), acumulación de distancia, ritmo suavizado, muestras
+  fuera de orden, generación de splits (uno, ninguno, múltiples), promedio
+  de FC por split.
+
+Durante la implementación de `RunState` se encontró y corrigió un bug real:
+`elapsedSeconds` se actualizaba *después* de chequear si correspondía
+generar un split, así que el split quedaba con la duración de la muestra
+anterior en vez de la actual. Ya corregido y cubierto por test
+(`testSplitGeneratedWhenCrossingThreshold`).
 
 ## Build iOS
 
@@ -62,6 +74,11 @@ Ver [docs/decisions.md](docs/decisions.md) para el detalle y motivos:
    por simplicidad en esta etapa).
 5. WHOOP validado como fuente HR viable (con matiz: requiere activar "HR
    Broadcast"); Polar Verity Sense / Scosche Rhythm24 como plan B.
+6. `HeartRateSource`/`LocationSource` con closures, no Combine (Combine no
+   existe en Windows/Linux).
+7. Timestamps como `TimeInterval` relativo (segundos desde el inicio de la
+   carrera), no `Date` — determinismo para tests y para el Simulation
+   Engine (Fase 3).
 
 ## Arquitectura
 
@@ -70,6 +87,28 @@ Resumen en [docs/architecture.md](docs/architecture.md): RunCoachCore
 CoreBluetooth/CoreLocation/AVFoundation, compilado solo en CI macOS). El
 motor de carrera nunca depende de la red; OpenAI se consulta solo ante
 eventos relevantes, de forma no bloqueante.
+
+**RunCoachCore implementado hasta ahora** (Fase 2):
+
+```
+RunCoachCore/Sources/RunCoachCore/
+├── Models/
+│   ├── HeartRateSample.swift
+│   ├── LocationSample.swift
+│   └── Split.swift
+├── Metrics/
+│   ├── MovingAverage.swift
+│   ├── GeoDistance.swift
+│   └── HeartRateTrend.swift
+├── Sources/
+│   ├── HeartRateSource.swift   (protocolo)
+│   └── LocationSource.swift    (protocolo)
+└── RunState.swift              (motor de ingestión y estado)
+```
+
+Explícitamente **fuera de alcance de Fase 2** (quedan para más adelante):
+Simulation Engine (Fase 3), detección de eventos más allá de tendencia de
+FC (Fase 8), Coach Decision Engine (Fase 10).
 
 ## Hardware
 
@@ -99,10 +138,21 @@ PROJECT_STATUS.md
 README.md
 .gitignore
 .github/workflows/runcoachcore-tests.yml
-RunCoachCore/Package.swift
-RunCoachCore/Sources/RunCoachCore/RunCoachCore.swift
-RunCoachCore/Tests/RunCoachCoreTests/RunCoachCoreTests.swift
 scripts/setup-swift-env.ps1
+RunCoachCore/Package.swift
+RunCoachCore/Sources/RunCoachCore/Models/HeartRateSample.swift
+RunCoachCore/Sources/RunCoachCore/Models/LocationSample.swift
+RunCoachCore/Sources/RunCoachCore/Models/Split.swift
+RunCoachCore/Sources/RunCoachCore/Metrics/MovingAverage.swift
+RunCoachCore/Sources/RunCoachCore/Metrics/GeoDistance.swift
+RunCoachCore/Sources/RunCoachCore/Metrics/HeartRateTrend.swift
+RunCoachCore/Sources/RunCoachCore/Sources/HeartRateSource.swift
+RunCoachCore/Sources/RunCoachCore/Sources/LocationSource.swift
+RunCoachCore/Sources/RunCoachCore/RunState.swift
+RunCoachCore/Tests/RunCoachCoreTests/MovingAverageTests.swift
+RunCoachCore/Tests/RunCoachCoreTests/GeoDistanceTests.swift
+RunCoachCore/Tests/RunCoachCoreTests/HeartRateTrendTests.swift
+RunCoachCore/Tests/RunCoachCoreTests/RunStateTests.swift
 docs/architecture.md
 docs/decisions.md
 docs/hardware.md
@@ -115,14 +165,15 @@ docs/windows-development.md
 
 ## Git
 
-Repo local inicializado (`main`), `.gitignore` configurado, primer commit
-hecho. Sin remoto en GitHub todavía (se conecta en Fase 4).
+Repo local inicializado (`main`), `.gitignore` configurado, commits hechos
+para Fase 0/1 y Fase 2. Sin remoto en GitHub todavía (se conecta en
+Fase 4).
 
 ## Próxima tarea
 
-Esperar confirmación explícita de Vicente ("Continuar con Fase 2") antes de
-empezar la implementación real de RunCoachCore: modelos de dominio
-(`HeartRateSample`, `LocationSample`, `RunState`, `Split`), motor de
-métricas (medias móviles, ritmo suavizado, splits), detección de tendencias/
-eventos, y las primeras piezas del Coach Decision Engine — todo con tests
-en Windows.
+Esperar confirmación explícita de Vicente ("Continuar con Fase 3") antes de
+empezar el Simulation Engine: fuente de datos sintética que implemente
+`HeartRateSource`/`LocationSource`, con escenarios reproducibles (tiempo,
+FC, GPS, fatiga, aceleraciones, recuperación, anomalías, pérdida temporal
+de señal) — incluyendo el escenario de referencia de 20 minutos descrito en
+[docs/testing.md](docs/testing.md).
