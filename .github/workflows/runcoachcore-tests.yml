@@ -1,0 +1,25 @@
+name: RunCoachCore tests
+
+on:
+  push:
+    paths:
+      - "RunCoachCore/**"
+      - ".github/workflows/runcoachcore-tests.yml"
+  pull_request:
+    paths:
+      - "RunCoachCore/**"
+
+jobs:
+  test-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "5.10"
+      - name: Build
+        working-directory: RunCoachCore
+        run: swift build
+      - name: Test
+        working-directory: RunCoachCore
+        run: swift test

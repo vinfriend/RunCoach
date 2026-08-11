@@ -1,0 +1,51 @@
+# --- Swift / SwiftPM ---
+.build/
+.swiftpm/
+*.o
+*.swiftmodule
+*.swiftdoc
+
+# --- Xcode ---
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+DerivedData/
+*.moved-aside
+*.xccheckout
+*.xcscmblueprint
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# XcodeGen generates the .xcodeproj from project.yml — never commit the generated project
+!project.yml
+
+# --- CocoaPods / Carthage (por si se usan en el futuro) ---
+Pods/
+Carthage/Build/
+
+# --- macOS ---
+.DS_Store
+
+# --- Windows ---
+Thumbs.db
+desktop.ini
+
+# --- Secrets / entornos ---
+.env
+.env.*
+*.pem
+*.p12
+*.mobileprovision
+*.cer
+secrets/
+**/Secrets.swift
+**/Config.local.*
+
+# --- Claude Code local settings (estado interno del harness, no del proyecto) ---
+.claude/
+
+# --- Logs y temporales ---
+*.log
+.tmp/
