@@ -84,13 +84,45 @@ Windows.
   un escenario), y `MockHeartRateSource`/`MockLocationSource` (implementan
   los protocolos de Fase 2 reproduciendo esas muestras).
 
-**Pendiente (fases futuras, explícitamente fuera de alcance de Fase 2/3):**
+**Implementado (Fase 6):**
 
-- **Detección de eventos** más allá de la tendencia de FC: deterioro,
-  recuperación, desviación de objetivo (Fase 8, Run Data Engine completo).
-- **Coach Decision Engine** (Fase 10): prioridades, cooldown, deduplicación,
-  contexto reciente, decisión hablar/callarse. La salida más común debe ser
-  "no hablar".
+- **BLE** (`BLE/`): `HeartRateMeasurementParser` — decodifica el payload
+  de la característica Heart Rate Measurement (`0x2A37`) del Bluetooth
+  Heart Rate Service estándar (`0x180D`), según la spec del Bluetooth SIG.
+  Lógica pura de bytes, sin CoreBluetooth — testeada en Windows. El
+  `CBCentralManager` que sí depende de CoreBluetooth vive en
+  `RunCoach-iOS` (`BLEHeartRateSource`).
+
+**Implementado (Fase 10 — Coach Decision Engine):**
+
+- **`CoachEvent`** (`Coach/`): los tipos de evento que el motor puede
+  detectar — hoy, `effortRising`/`effortFalling` (basados en
+  `RunState.heartRateTrend`). Sin texto ni idioma — eso lo genera
+  `RunCoach-iOS`.
+- **`CoachEventDetector`**: función pura y sin memoria que clasifica el
+  `RunState` actual en un `CoachEvent` candidato (o `nil`). Separado
+  deliberadamente de la decisión de si vale la pena decirlo — ver
+  `CoachDecisionEngine` y [docs/decisions.md](decisions.md).
+- **`CoachDecisionEngine`**: la pieza central del proyecto. Decide
+  `.silence` o `.speak(event)` combinando deduplicación (por *tipo* de
+  evento, no por igualdad estricta — ver el bug corregido en
+  decisions.md), cooldown temporal, y un historial acotado de eventos
+  hablados (`recentSpokenEvents`, "contexto reciente"). Un evento
+  bloqueado por cooldown no se pierde: se reintenta en la próxima
+  evaluación si la condición sigue vigente.
+- Validado contra el escenario de referencia completo de 20 minutos: la
+  salida más frecuente es `.silence`, con como máximo 3 intervenciones en
+  toda la carrera (criterio de [docs/testing.md](testing.md)).
+- **Sin implementar**: arbitraje de prioridades entre eventos que
+  compitan entre sí — hoy solo hay un detector (tendencia de FC), así que
+  nunca hay dos candidatos simultáneos que priorizar. Se vuelve relevante
+  con más detectores o con las recomendaciones de OpenAI (Fase 11).
+
+**Pendiente (fases futuras):**
+
+- **Detección de eventos** más allá de la tendencia de FC: desviación de
+  objetivo, aceleraciones/anomalías puntuales (posible ampliación futura
+  de `CoachEventDetector`, no planificada todavía).
 
 ### RunCoach-iOS (proyecto Xcode, generado con XcodeGen)
 
@@ -155,16 +187,29 @@ el iPhone esté en silencio, bajando (no cortando) otro audio que esté
 sonando. **Es solo infraestructura de voz: no decide nada.**
 `RunSessionViewModel` la usa para anunciar eventos mecánicos que
 `RunCoachCore` ya calcula — inicio/fin de carrera, cada split completado
-con su ritmo — sin ninguna lógica de "¿vale la pena hablar ahora?". Esa
-decisión (prioridades, cooldown, deduplicación) es el Coach Decision
-Engine, Fase 10, todavía no implementado.
+con su ritmo — sin ninguna lógica de "¿vale la pena hablar ahora?".
 
 A diferencia de BLE, el simulador de iOS sí reproduce audio — pero sin Mac
 para abrir Xcode, sigue sin poder escucharse ni validarse de este lado.
 
-Como no hay Mac local, todo este código solo se valida por CI (compila
-para simulador) — nunca se vio corriendo, ni se escuchó sonar. Ver
-PROJECT_STATUS.md para el resultado real del build.
+**Implementado (Fase 10 — Coach Decision Engine):**
+
+La pieza central del proyecto, y la primera de las últimas cinco fases que
+vive enteramente en `RunCoachCore` — **totalmente testeable en Windows**,
+a diferencia de BLE/GPS/Audio (Fases 6-9). Ver
+[docs/decisions.md](decisions.md) para el detalle de diseño, incluyendo un
+bug real encontrado y corregido durante la implementación.
+
+`RunSessionViewModel` consulta `CoachDecisionEngine` en cada `refresh()` y,
+cuando decide `.speak(event)`, traduce el `CoachEvent` a español y se lo
+pasa a `AudioCoach` — el mismo mecanismo de Fase 9, ahora con criterio real
+detrás en vez de solo eventos mecánicos.
+
+Como no hay Mac local, todo el código de `RunCoach-iOS` (incluyendo esta
+integración) solo se valida por CI (compila para simulador) — nunca se vio
+corriendo, ni se escuchó sonar. `RunCoachCore`, en cambio, sí está
+verificado de verdad: ver PROJECT_STATUS.md para el resultado del build de
+CI y el detalle de tests.
 
 ## HeartRateSource: independencia de marca
 

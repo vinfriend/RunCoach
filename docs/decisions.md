@@ -357,3 +357,62 @@ con voz.
 **Sin validar con audio real** — a diferencia de BLE, el simulador de iOS
 sí reproduce audio, así que en teoría esto se podría escuchar sin
 hardware — pero seguimos sin Mac para abrir Xcode y probarlo.
+
+---
+
+## 2026-08-11 — Fase 10: Event Detector separado de la decisión de hablar
+
+**Decisión**: `CoachEventDetector.detect(runState:)` es una función pura y
+sin memoria — solo clasifica el `RunState` actual en un `CoachEvent`
+candidato (o `nil`), sin saber si ya se dijo antes. Toda la lógica
+temporal (deduplicación, cooldown, contexto reciente) vive en
+`CoachDecisionEngine`, que sí tiene estado.
+
+**Motivo**: si el detector tuviera memoria propia (por ejemplo, "no volver
+a emitir `.rising` hasta que la tendencia vuelva a `.stable`"), un evento
+bloqueado por cooldown en `CoachDecisionEngine` se perdería para siempre
+en esa fase de la carrera — el detector ya lo habría marcado como "ya
+emitido" aunque nunca se haya llegado a decir. Con el detector sin
+memoria, un evento que sigue vigente se re-ofrece en cada evaluación, y es
+`CoachDecisionEngine` quien decide cuándo dejarlo pasar.
+
+**Alternativas consideradas**: detector con estado propio — descartada
+por la razón de arriba, tras notar el problema al diseñar el cooldown.
+
+---
+
+## 2026-08-11 — Bug real: deduplicar por tipo de evento, no por igualdad estricta
+
+**Qué pasó**: el primer test contra el escenario de referencia completo
+(`testCoachDecisionEngineSpeaksSparinglyAcrossFullRun`) falló — el motor
+habló **10 veces** en 20 minutos simulados, muy por encima del criterio de
+"como máximo 2-3" de [docs/testing.md](testing.md).
+
+**Causa**: `CoachEvent` es un enum con el BPM actual como valor asociado
+(`effortRising(currentBPM: Double)`). La deduplicación original comparaba
+`event != recentSpokenEvents.last` — igualdad *estricta*, que compara
+también el BPM asociado. Como el BPM cambia en casi cada muestra mientras
+la tendencia se sostiene, `.effortRising(currentBPM: 160.1)` y
+`.effortRising(currentBPM: 160.3)` nunca se consideraban "el mismo
+evento", así que la deduplicación nunca frenaba nada — hablaba de nuevo en
+cada muestra donde la tendencia seguía siendo `.rising`.
+
+**Fix**: agregar `CoachEvent.kind` (un enum sin valores asociados,
+`effortRising`/`effortFalling`) y deduplicar comparando `event.kind !=
+recentSpokenEvents.last?.kind` en vez de igualdad estricta del evento
+completo. Con el fix, el mismo test pasa con el resultado esperado (pocas
+intervenciones en toda la carrera).
+
+**Cómo se encontró**: exactamente el tipo de bug que un test de "golden
+path" end-to-end está pensado para atrapar — ningún test unitario
+aislado del detector o del motor lo hubiera detectado, porque ahí los
+valores de BPM eran fijos entre llamadas. Confirma el valor de tener el
+test del escenario completo de 20 minutos, no solo tests unitarios
+puntuales.
+
+**Impacto en el diseño**: `CoachEvent` sigue siendo `Equatable` con
+igualdad estricta (útil para tests que verifican el evento exacto
+hablado, como `testFirstDetectedEventSpeaksImmediately`), pero
+`CoachDecisionEngine` nunca debe usar esa igualdad para deduplicar — debe
+usar `.kind`. Si se agregan más casos a `CoachEvent` en el futuro, hay que
+recordar extender `CoachEvent.Kind` en paralelo.

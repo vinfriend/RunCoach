@@ -74,4 +74,29 @@ final class ReferenceScenarioTests: XCTestCase {
 
         XCTAssertEqual(state.heartRateTrend, .stable)
     }
+
+    /// El test más importante de esta fase: corre el escenario de
+    /// referencia completo (1200 muestras de FC) a través del Coach
+    /// Decision Engine y verifica el criterio de docs/testing.md — la
+    /// salida más frecuente debe ser silencio, no una intervención por
+    /// muestra.
+    func testCoachDecisionEngineSpeaksSparinglyAcrossFullRun() {
+        let heartRateSamples = ScenarioSimulator.generateHeartRateSamples(for: .referenceRun)
+        let state = RunState()
+        let engine = CoachDecisionEngine()
+
+        var spokenEvents: [CoachEvent] = []
+        for sample in heartRateSamples {
+            state.ingest(heartRate: sample)
+            if case .speak(let event) = engine.evaluate(runState: state) {
+                spokenEvents.append(event)
+            }
+        }
+
+        XCTAssertLessThanOrEqual(spokenEvents.count, 3)
+        XCTAssertGreaterThanOrEqual(
+            spokenEvents.count, 1,
+            "el escenario tiene un tramo de subida y uno de recuperación; el motor no debería quedarse mudo del todo"
+        )
+    }
 }

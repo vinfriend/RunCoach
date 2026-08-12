@@ -6,26 +6,36 @@
 
 ## Fase actual
 
-**Fases 0 a 8** — **completadas**. Resumen rápido:
+**Fases 0 a 9** — **completadas**. Resumen rápido:
 
 - **0-1**: entorno Windows listo, arquitectura e investigación.
 - **2-3**: `RunCoachCore` (modelos, métricas, `RunState`, Simulation
-  Engine) — 48 tests en verde en Windows.
+  Engine) — 40 tests en verde en Windows.
 - **4-5**: proyecto iOS + CI en Codemagic, UI SwiftUI con pantalla de
   carrera simulada.
 - **6-7**: `BLEHeartRateSource` (CoreBluetooth) y `GPSLocationSource`
   (CoreLocation) — validados solo por compilación en CI, sin hardware
-  real todavía.
+  real todavía. `HeartRateMeasurementParser` (parsing GATT) sí testeado
+  en Windows.
 - **8**: `RunSessionViewModel` soporta modo real (BLE+GPS con `Date` de
   referencia compartido) además del simulado; `RunView` deja elegir.
+- **9**: `AudioCoach` (voz `es-AR`) anuncia eventos mecánicos —
+  inicio/fin de carrera, cada split. Sin lógica de decisión todavía.
 
-**Fase 9** (Audio Coach) — **completada** (en el sentido de "compila").
-Build de Codemagic para el commit `4477ba1` terminó `finished` sin pasos
-fallidos (1m 5s). `AudioCoach` (`AVSpeechSynthesizer`, voz `es-AR`) es
-pura infraestructura de voz — sin ninguna lógica de decisión. Anuncia
-eventos mecánicos que `RunCoachCore` ya calcula: inicio/fin de carrera,
-cada split completado con su ritmo. El Coach Decision Engine (cuándo/qué
-vale la pena decir) sigue siendo Fase 10, no implementado.
+**Fase 10** (Coach Decision Engine) — **implementada, pendiente de
+confirmar build de CI de RunCoach-iOS**. La pieza central del proyecto, y
+la primera de las últimas cinco en vivir enteramente en `RunCoachCore` —
+**totalmente testeable en Windows**: 59 tests en verde (11 nuevos).
+`CoachDecisionEngine` decide `.silence`/`.speak(event)` combinando
+deduplicación, cooldown, y contexto reciente. Validado contra el
+escenario completo de 20 minutos: pocas intervenciones, no una por
+muestra. Ya wireado a `AudioCoach` en `RunSessionViewModel`.
+
+**Bug real encontrado y corregido durante esta fase** (ver "Decisiones
+tomadas" #17): la deduplicación comparaba eventos por igualdad estricta
+(incluyendo el BPM exacto, que cambia en cada muestra), así que hablaba
+10 veces en vez de 2-3. El test de escenario completo lo atrapó
+inmediatamente.
 
 Nota de proceso (desde Fase 5): el trigger automático por `push` de
 Codemagic no dispara solo — hay que iniciar el build a mano desde el
@@ -57,37 +67,52 @@ Detalle completo en [docs/windows-development.md](docs/windows-development.md).
 
 ## Tests en Windows
 
-**48 tests, 0 fallas**, en `RunCoachCore`. Sin cambios desde Fase 3 — todo
-lo de Fases 4-9 vive en `RunCoach-iOS` (no testeable en Windows).
+**59 tests, 0 fallas**, en `RunCoachCore`:
+
+- Fases 2-3 (40): modelos, métricas, `RunState`, Simulation Engine.
+- Fase 6 (8): `HeartRateMeasurementParser` — parsing GATT del Heart Rate
+  Service.
+- Fase 10 (11): `CoachEventDetectorTests` (4), `CoachDecisionEngineTests`
+  (6), y el test de escenario completo de 20 minutos (1) que atrapó el
+  bug de deduplicación — ver docs/decisions.md.
 
 ## Build iOS
 
-**Fases 4 a 9 validadas en CI real** (todos los builds verdes).
-Recordatorio permanente: un build verde solo confirma que compila, no que
-funcione (ni siquiera que se escuche) con hardware real.
+**Fases 4 a 9 validadas en CI real** (builds verdes). **Fase 10:
+pendiente de confirmar** — ver "Próxima tarea" (solo la parte
+`RunCoach-iOS`; `RunCoachCore` ya está confirmado por los 59 tests de
+arriba).
 
-### Qué se agregó en Fase 9
+### Qué se agregó en Fase 10
 
-- `RunCoach-iOS/App/Audio/AudioCoach.swift`: envuelve
-  `AVSpeechSynthesizer` con voz `es-AR`, `AVAudioSession` en
-  `.playback`/`.spokenAudio`/`.duckOthers` (suena con el iPhone en
-  silencio, baja otro audio en vez de cortarlo). Método único relevante:
-  `speak(_ text: String)` — no decide nada, solo dice lo que le pasan.
-- `RunSessionViewModel`: ahora anuncia por voz el inicio de carrera
-  (simulada o real), el fin de la carrera simulada, la detención manual, y
-  cada split completado con su ritmo (ej. "Kilómetro 2. Ritmo: 5 minutos
-  30 por kilómetro.").
+**En `RunCoachCore` (testeado en Windows):**
 
-### Qué NO se hizo en Fase 9 (a propósito)
+- `CoachEvent` (`Coach/`): `effortRising`/`effortFalling`, con un `.kind`
+  para deduplicar sin comparar el BPM exacto.
+- `CoachEventDetector`: función pura, sin memoria, que clasifica el
+  `RunState` actual en un evento candidato (o `nil`).
+- `CoachDecisionEngine`: decide `.silence`/`.speak(event)` combinando
+  deduplicación por tipo de evento, cooldown temporal (90s por defecto),
+  y contexto reciente (`recentSpokenEvents`, historial acotado). Un
+  evento bloqueado por cooldown se reintenta después, no se pierde.
 
-- **Nada de lógica de decisión** — sin prioridades, cooldown,
-  deduplicación, ni juicio sobre si vale la pena hablar. Eso es
-  explícitamente el Coach Decision Engine, Fase 10.
-- Sin manejo de interrupciones de audio (llamadas telefónicas, otra app
-  tomando la sesión) — se afina con un iPhone real (Fase 13+).
-- Sin voz conversacional ni Realtime API — el prompt original es
-  explícito: "no introducir voz conversacional completa... primero quiero
-  que el coach me hable, no necesito hablarle durante una carrera."
+**En `RunCoach-iOS` (solo compilado, no verificado funcionalmente):**
+
+- `RunSessionViewModel`: consulta `CoachDecisionEngine` en cada
+  `refresh()`; cuando decide `.speak`, traduce el evento a español y se
+  lo pasa a `AudioCoach`. Se resetea un `CoachDecisionEngine` nuevo en
+  cada `start*()`, igual que `RunState`.
+
+### Qué NO se hizo en Fase 10 (a propósito)
+
+- **Arbitraje de prioridades entre eventos que compitan entre sí** — hoy
+  solo hay un detector (tendencia de FC), así que nunca hay dos
+  candidatos simultáneos que priorizar de verdad. Se vuelve relevante con
+  más detectores o con las recomendaciones de OpenAI (Fase 11).
+- Nada de OpenAI todavía — Fase 11.
+- Ningún detector nuevo más allá de tendencia de FC (pace deviation,
+  anomalías) — no estaba pedido para esta fase, y sin datos reales es
+  difícil calibrar umbrales con confianza.
 
 ## Decisiones tomadas
 
@@ -115,16 +140,21 @@ Ver [docs/decisions.md](docs/decisions.md) para el detalle y motivos:
     la validación de background real quedan para Fase 15.
 15. `referenceStartDate` de `BLEHeartRateSource`/`GPSLocationSource` es
     inyectable (no auto-asignado), compartido entre ambas fuentes.
-16. `AudioCoach` es infraestructura pura, sin lógica de decisión — los
-    anuncios de Fase 9 están atados a eventos mecánicos de RunCoachCore,
-    no a juicios sobre qué vale la pena decir (eso es Fase 10).
+16. `AudioCoach` es infraestructura pura, sin lógica de decisión.
+17. `CoachEventDetector` es sin memoria a propósito — toda la lógica
+    temporal vive en `CoachDecisionEngine`, para que un evento bloqueado
+    por cooldown se pueda reintentar en vez de perderse.
+18. Deduplicar por `CoachEvent.kind`, no por igualdad estricta — bug real
+    encontrado por el test de escenario completo (hablaba 10 veces en vez
+    de 2-3 porque el BPM asociado cambiaba en cada muestra).
 
 ## Arquitectura
 
-Resumen en [docs/architecture.md](docs/architecture.md). Con Fase 9, las
-tres piezas del lado Apple (BLE, GPS, Audio) ya existen; falta la que las
-conecta con inteligencia real (Coach Decision Engine, Fase 10) y la que
-las conecta con IA externa (OpenAI, Fase 11).
+Resumen en [docs/architecture.md](docs/architecture.md). Con Fase 10, la
+pieza que le da sentido a todo el proyecto —"cuándo vale la pena que el
+coach hable"— ya existe y está testeada de verdad. Falta conectarla con
+OpenAI (Fase 11) para que lo que dice sea más rico que frases fijas en
+español.
 
 ## Hardware
 
@@ -134,16 +164,22 @@ Sin compras realizadas.
 ## Riesgos identificados
 
 Ver tabla completa en [docs/architecture.md](docs/architecture.md#riesgos-identificados-fase-1).
-`AudioCoach` es, a diferencia de BLE, algo que en teoría el simulador de
-iOS podría reproducir (tiene salida de audio) — pero sin Mac para abrir
-Xcode, el riesgo práctico de "código nunca antes escuchado" es el mismo
-que en Fases 6-8.
+Sin cambios nuevos — la parte de `RunCoach-iOS` de Fase 10 hereda el mismo
+riesgo de "código nunca antes escuchado" de Fases 6-9. La parte de
+`RunCoachCore`, en cambio, es la más sólidamente verificada del proyecto
+hasta ahora.
 
-## Archivos creados/modificados (Fase 9)
+## Archivos creados/modificados (Fase 10)
 
 ```
-RunCoach-iOS/App/Audio/AudioCoach.swift               (nuevo)
-RunCoach-iOS/App/ViewModels/RunSessionViewModel.swift (modificado)
+RunCoachCore/Sources/RunCoachCore/Coach/CoachEvent.swift            (nuevo)
+RunCoachCore/Sources/RunCoachCore/Coach/CoachEventDetector.swift    (nuevo)
+RunCoachCore/Sources/RunCoachCore/Coach/CoachDecision.swift         (nuevo)
+RunCoachCore/Sources/RunCoachCore/Coach/CoachDecisionEngine.swift   (nuevo)
+RunCoachCore/Tests/RunCoachCoreTests/CoachEventDetectorTests.swift  (nuevo)
+RunCoachCore/Tests/RunCoachCoreTests/CoachDecisionEngineTests.swift (nuevo)
+RunCoachCore/Tests/RunCoachCoreTests/ReferenceScenarioTests.swift   (modificado)
+RunCoach-iOS/App/ViewModels/RunSessionViewModel.swift               (modificado)
 ```
 
 ## Git
@@ -153,8 +189,8 @@ Repo en GitHub: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/Run
 
 ## Próxima tarea
 
-Esperar "Continuar con Fase 10" (Coach Decision Engine) de Vicente — la
-pieza central del proyecto: prioridades, cooldown, deduplicación, y la
-decisión de hablar o quedarse callado. Esta sí se puede testear de verdad
-en Windows (es lógica pura, va en RunCoachCore), a diferencia de las
-últimas cuatro fases.
+Confirmar con Vicente el build de Codemagic para el commit de Fase 10
+(hay que iniciarlo a mano). Si pasa, Fase 10 queda completa. Después,
+esperar "Continuar con Fase 11" (OpenAI) de Vicente — la primera fase que
+va a requerir que Vicente cree una cuenta/API key de OpenAI (con
+autorización explícita, nunca guardada en Git).

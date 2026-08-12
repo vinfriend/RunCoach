@@ -53,32 +53,43 @@ a través de `MockHeartRateSource`/`MockLocationSource` → `RunState`, y que
 la tendencia de FC sea `.stable` durante el calentamiento, `.rising`
 durante el aumento de ritmo, y `.falling` durante la recuperación.
 
-Este escenario sirve como "golden path" para validar, más adelante, el
-Coach Decision Engine (Fase 10): se espera que NO hable en los primeros
-minutos, y que sí genere como máximo una intervención relevante alrededor
-del minuto 15 — eso todavía no está implementado ni testeado, porque el
-Coach Decision Engine es una fase aparte.
+Este escenario sirve como "golden path" para validar el Coach Decision
+Engine (Fase 10, implementado): se espera que NO hable en los primeros
+minutos, y que genere unas pocas intervenciones relevantes en total.
+Cubierto por `testCoachDecisionEngineSpeaksSparinglyAcrossFullRun`
+(`ReferenceScenarioTests`).
 
 ## Criterio de "no hablar por defecto"
 
-El Coach Decision Engine se testea explícitamente para que, ante datos
+**Implementado y testeado (Fase 10).** El Coach Decision Engine
+(`CoachDecisionEngine`) se testea explícitamente para que, ante datos
 estables o cambios menores, la decisión más frecuente sea "no intervenir".
-Un test de regresión debe verificar que, para el escenario completo de
-referencia, el número de intervenciones generadas se mantenga bajo (por
-ejemplo, ≤ 2-3 en 20 minutos de simulación), no una por cada muestra.
+`testCoachDecisionEngineSpeaksSparinglyAcrossFullRun` corre el escenario
+completo de referencia (1200 muestras de FC) y verifica que el número de
+intervenciones se mantenga ≤ 3 en 20 minutos de simulación — no una por
+cada muestra.
+
+Durante la implementación, este mismo test atrapó un bug real: la
+deduplicación comparaba eventos por igualdad estricta (incluyendo el BPM
+exacto, que cambia en casi cada muestra), así que nunca detectaba que "ya
+había dicho esto" y hablaba 10 veces en vez de 2-3. Corregido comparando
+por `CoachEvent.kind` en vez de por el evento completo — ver
+[docs/decisions.md](decisions.md) para el detalle. Es el ejemplo más claro
+hasta ahora de por qué vale la pena tener un test de escenario completo,
+no solo tests unitarios aislados.
 
 ## Estado actual
 
-**Fase 3 completada.** 40 tests en verde (`swift test`), cubriendo:
+**Fase 10 completada.** 59 tests en verde (`swift test`) en `RunCoachCore`,
+cubriendo:
 
-- Fase 2: modelos, métricas (`MovingAverage`, `GeoDistance`,
-  `HeartRateTrend`), y `RunState` (splits, distancia, ritmo, tendencia).
-- Fase 3: interpolación de segmentos (`ScenarioSegmentTests`), generación
-  determinista de muestras incluyendo pérdida de señal y anomalías
-  (`ScenarioSimulatorTests`), reproducción de fuentes simuladas
-  (`MockSourceTests`), y el escenario de referencia de 20 minutos de punta
-  a punta (`ReferenceScenarioTests`).
+- Fases 2-3: modelos, métricas, `RunState`, Simulation Engine (40 tests).
+- Fase 6: `HeartRateMeasurementParser` — parsing GATT del Heart Rate
+  Service, sin CoreBluetooth (8 tests).
+- Fase 10: `CoachEventDetector` y `CoachDecisionEngine` — detección de
+  eventos, deduplicación, cooldown, contexto reciente, y el test de
+  escenario completo descrito arriba (11 tests).
 
-Explícitamente sin cubrir todavía (fases futuras): Coach Decision Engine
-(Fase 10), UI/integración iOS (Fase 5+), pruebas con hardware real (Fases
-17-18).
+Explícitamente sin cubrir todavía (fases futuras): UI/integración iOS
+(Fases 4-9, solo validadas por compilación en CI — ver PROJECT_STATUS.md),
+pruebas con hardware real (Fases 14-18).

@@ -30,8 +30,15 @@ enum RunMode: Equatable {
 /// **Audio (Fase 9)**: anuncia inicio/fin de carrera y cada split
 /// completado por `AudioCoach`. Son anuncios mecánicos atados a eventos
 /// concretos que `RunCoachCore` ya calcula — no hay ninguna decisión de
-/// "¿vale la pena hablar ahora?". Eso es el Coach Decision Engine, Fase
-/// 10, todavía sin implementar.
+/// "¿vale la pena hablar ahora?" en esa parte.
+///
+/// **Coach Decision Engine (Fase 10)**: además de los anuncios mecánicos,
+/// en cada `refresh()` se consulta a `CoachDecisionEngine` (RunCoachCore)
+/// — la pieza que sí decide cuándo vale la pena intervenir (cooldown,
+/// deduplicación, contexto reciente). Cuando decide `.speak(event)`, acá
+/// se traduce ese `CoachEvent` a una frase en español y se la pasa a
+/// `AudioCoach`. La traducción a texto vive acá (capa de presentación),
+/// no en `RunCoachCore`, igual que el resto del formateo de esta clase.
 final class RunSessionViewModel: ObservableObject {
     @Published private(set) var isRunning = false
     @Published private(set) var mode: RunMode?
@@ -49,6 +56,7 @@ final class RunSessionViewModel: ObservableObject {
     private let playbackSpeed: Double
 
     private var runState = RunState()
+    private var coachDecisionEngine = CoachDecisionEngine()
     private var pendingWorkItems: [DispatchWorkItem] = []
     private let audioCoach = AudioCoach()
 
@@ -67,6 +75,7 @@ final class RunSessionViewModel: ObservableObject {
         mode = .simulated
         isRunning = true
         runState = RunState()
+        coachDecisionEngine = CoachDecisionEngine()
         audioCoach.speak("Carrera simulada iniciada.")
 
         let heartRateSamples = ScenarioSimulator.generateHeartRateSamples(for: scenario)
@@ -90,6 +99,7 @@ final class RunSessionViewModel: ObservableObject {
         mode = .real
         isRunning = true
         runState = RunState()
+        coachDecisionEngine = CoachDecisionEngine()
         audioCoach.speak("Carrera iniciada.")
 
         // Mismo Date de referencia para ambas fuentes — ver el comentario
@@ -187,6 +197,10 @@ final class RunSessionViewModel: ObservableObject {
         if splits.count > previousSplitCount, let latestSplit = splits.last {
             announceSplit(latestSplit)
         }
+
+        if case .speak(let event) = coachDecisionEngine.evaluate(runState: runState) {
+            audioCoach.speak(spokenText(for: event))
+        }
     }
 
     /// Anuncio mecánico de un split recién completado — no es una
@@ -196,6 +210,18 @@ final class RunSessionViewModel: ObservableObject {
     private func announceSplit(_ split: Split) {
         let km = split.index + 1
         audioCoach.speak("Kilómetro \(km). Ritmo: \(spokenPace(split.averagePaceSecondsPerKm)).")
+    }
+
+    /// Traduce un `CoachEvent` (RunCoachCore, sin idioma) a una frase en
+    /// español. Esta traducción vive acá a propósito — `RunCoachCore` no
+    /// sabe de idiomas ni de texto para voz.
+    private func spokenText(for event: CoachEvent) -> String {
+        switch event {
+        case .effortRising(let bpm):
+            return "Tu esfuerzo está subiendo. Frecuencia cardíaca: \(Int(bpm.rounded())) por minuto."
+        case .effortFalling(let bpm):
+            return "Estás recuperando. Frecuencia cardíaca bajando a \(Int(bpm.rounded())) por minuto."
+        }
     }
 
     private func spokenPace(_ secondsPerKm: Double?) -> String {
