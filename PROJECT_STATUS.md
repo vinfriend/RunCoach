@@ -19,11 +19,12 @@ de verdad: 8 tests nuevos en verde en Windows. La parte de CoreBluetooth
 (`BLEHeartRateSource`) solo está validada por compilación — **ni siquiera
 el simulador de iOS sirve para probar BLE real**, así que sigue
 funcionalmente sin verificar hasta tener hardware real (Fase 14).
-**Fase 7** (GPS) — **implementada, pendiente de confirmar build de CI**.
-`GPSLocationSource` (CoreLocation) sigue el mismo patrón que Fase 6:
-válido solo por compilación de mi lado (sin Mac). A diferencia de BLE, el
-simulador de iOS sí soporta simular ubicación — pero sin Mac para abrir
-Xcode, la diferencia práctica con Fase 6 es nula por ahora.
+**Fase 7** (GPS) — **completada** (en el sentido de "compila"). Build de
+Codemagic para el commit `f4d289b` terminó `finished` sin pasos fallidos
+(1m 2s). `GPSLocationSource` (CoreLocation) sigue el mismo patrón que
+Fase 6: válido solo por compilación de mi lado (sin Mac). A diferencia de
+BLE, el simulador de iOS sí soporta simular ubicación — pero sin Mac para
+abrir Xcode, la diferencia práctica con Fase 6 es nula por ahora.
 
 Nota de proceso (desde Fase 5): el trigger automático por `push` de
 Codemagic no está disparando solo — hay que iniciar el build a mano desde
@@ -63,10 +64,10 @@ lograr esto.
 
 ## Build iOS
 
-**Fases 4, 5 y 6 validadas en CI real** (builds verdes). **Fase 7:
-pendiente de confirmar** — ver "Próxima tarea". Para Fase 6/7 en general:
-un build verde solo confirma que el código compila contra las APIs de
-CoreBluetooth/CoreLocation — no que funcione con hardware/GPS real.
+**Fases 4 a 7 validadas en CI real** (todos los builds verdes). Para
+Fase 6/7 en general: un build verde solo confirma que el código compila
+contra las APIs de CoreBluetooth/CoreLocation — no que funcione con
+hardware/GPS real.
 
 ### Qué se agregó en Fase 6
 
@@ -174,9 +175,6 @@ Repo en GitHub: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/Run
 
 ## Próxima tarea
 
-Confirmar con Vicente el build de Codemagic para el commit de Fase 7 (hay
-que iniciarlo a mano). Si pasa, Fase 7 queda completa en el sentido de
-"compila". Después, esperar "Continuar con Fase 8" (Run Data Engine
-completo) — ahí es cuando `BLEHeartRateSource` y `GPSLocationSource`
-finalmente se conectan a la UI, reemplazando la simulación para carreras
-reales.
+Esperar "Continuar con Fase 8" (Run Data Engine completo) de Vicente — ahí
+es cuando `BLEHeartRateSource` y `GPSLocationSource` finalmente se
+conectan a la UI, reemplazando la simulación para carreras reales.
