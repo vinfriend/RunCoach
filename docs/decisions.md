@@ -126,3 +126,36 @@ progresión del tiempo de forma reproducible (ver
 
 **Alternativas consideradas**: `Date` — descartado porque acopla los tests
 al reloj real y complica la simulación determinista.
+
+---
+
+## 2026-08-11 — Bundle ID `com.vicente.runcoach` como placeholder
+
+**Decisión**: usar `com.vicente.runcoach` como `PRODUCT_BUNDLE_IDENTIFIER`
+en `RunCoach-iOS/project.yml`.
+
+**Motivo**: hace falta *algún* bundle ID válido para que el proyecto
+compile, pero todavía no existe una cuenta de Apple Developer (esa es la
+Fase 12) que determine el identificador real/definitivo. Es un valor
+trivial de cambiar más adelante (una línea en `project.yml`), así que no
+se bloqueó la Fase 4 por esto.
+
+**Impacto**: cuando se cree la cuenta de Apple Developer (Fase 12), hay que
+revisar este valor contra el identificador real registrado ahí antes de
+intentar firmar o subir a TestFlight.
+
+---
+
+## 2026-08-11 — Fase 4: build de CI sin firma (solo simulador)
+
+**Decisión**: el primer workflow de Codemagic (`codemagic.yaml`) compila
+para `generic/platform=iOS Simulator` con `CODE_SIGNING_ALLOWED=NO`, sin
+firma, sin provisioning profile, sin publishing.
+
+**Motivo**: todavía no hay cuenta de Apple Developer ni certificados (Fase
+12). El objetivo de Fase 4 es validar que el proyecto compila en CI sin
+depender de una Mac local — no requiere firma para eso. Firmar y subir a
+TestFlight se agrega recién en las Fases 12-13, cuando haya con qué firmar.
+
+**Alternativas consideradas**: ninguna — firmar sin certificados no es
+posible, así que no había otra opción real para Fase 4.

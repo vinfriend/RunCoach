@@ -1,0 +1,38 @@
+workflows:
+  runcoach-ios-unsigned-build:
+    name: RunCoach iOS — build sin firma (Fase 4)
+    max_build_duration: 30
+    instance_type: mac_mini_m2
+    environment:
+      xcode: latest
+      vars:
+        XCODE_PROJECT: "RunCoach-iOS/RunCoach.xcodeproj"
+        XCODE_SCHEME: "RunCoach"
+    scripts:
+      - name: Instalar XcodeGen
+        script: brew install xcodegen
+
+      - name: Generar el proyecto Xcode desde project.yml
+        script: |
+          cd RunCoach-iOS
+          xcodegen generate
+
+      - name: Build para iOS Simulator (sin firma)
+        script: |
+          xcodebuild build \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -destination "generic/platform=iOS Simulator" \
+            CODE_SIGNING_ALLOWED=NO
+
+    # Sin publishing todavía — no hay Apple Developer account (Fase 12) ni
+    # necesidad de TestFlight en esta fase. El objetivo de Fase 4 es
+    # únicamente "el proyecto compila en CI sin depender de una Mac local".
+
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+      cancel_previous_builds: true

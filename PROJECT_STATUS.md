@@ -10,14 +10,33 @@
 **Fase 1** (arquitectura/investigación) — **completada**.
 **Fase 2** (RunCoachCore: modelos, métricas, `RunState`) — **completada**.
 **Fase 3** (Simulation Engine) — **completada**.
+**Fase 4** (Proyecto iOS + CI macOS) — **parcialmente completada, bloqueada
+en la parte que requiere a Vicente** (ver "Bloqueos" abajo).
 
-Fase 4 (Proyecto iOS + CI macOS) es la siguiente, a la espera de que
-Vicente confirme para arrancarla.
+Lo que se podía hacer sin intervención de Vicente ya está hecho:
+`project.yml`, skeleton de la app iOS, `codemagic.yaml`. Falta: crear el
+repo en GitHub, conectar Codemagic, y correr el build real en CI — eso
+necesita login/autorización de Vicente.
 
 ## Último commit estable
 
-Ver `git log --oneline -1` para el hash exacto. Incluye Fase 0, Fase 1,
-Fase 2 y Fase 3.
+Ver `git log --oneline -1` para el hash exacto. Incluye Fase 0 a Fase 4
+(la parte de Fase 4 que no requiere GitHub/Codemagic).
+
+## Bloqueos
+
+- **Repo en GitHub**: no existe todavía. Necesita que Vicente cree el repo
+  y/o autorice `gh auth login` (OAuth) — no es algo que se pueda hacer sin
+  su intervención. Ver instrucciones exactas al final de este documento /
+  en la respuesta de esta sesión.
+- **Cuenta de Codemagic**: no existe todavía. Necesita que Vicente se
+  registre (típicamente con "Sign in with GitHub", requiere el repo ya
+  creado) y autorice el acceso al repo.
+- **`codemagic.yaml` sin validar en CI**: como no hay Mac local, este
+  archivo no se pudo ejecutar ni probar antes de escribirlo — su primera
+  ejecución real va a ser en Codemagic una vez conectado. Si falla al
+  primer intento, es información nueva a corregir, no necesariamente un
+  error de diseño.
 
 ## Entorno Windows
 
@@ -27,184 +46,108 @@ Fase 2 y Fase 3.
 | AMD Ryzen AI 7 350, 8 núcleos/16 hilos, ~14GB RAM, ~334GB libres en C:\ | OK |
 | Git 2.54.0 | OK, ya configurado |
 | Swift toolchain 6.3.3 (swift.org, winget) | OK |
-| Visual Studio 2022 Build Tools + Windows 11 SDK (10.0.22621.0) | OK — requerido por Swift para enlazar en Windows |
+| Visual Studio 2022 Build Tools + Windows 11 SDK (10.0.22621.0) | OK |
 | VS Code 1.118.0 | OK |
 | winget 1.29.280 | OK |
-| GitHub CLI (`gh`) | No instalado — se instala en Fase 4 al conectar GitHub |
+| GitHub CLI (`gh`) | **Instalado** (Fase 4) — sin autenticar todavía (`gh auth login` pendiente, acción de Vicente) |
 | Docker | No instalado — no requerido por ahora |
 
-Detalle completo, incluyendo el setup de entorno necesario en cada terminal
-nueva, en [docs/windows-development.md](docs/windows-development.md).
+Detalle completo en [docs/windows-development.md](docs/windows-development.md).
 
 ## Tests en Windows
 
-**`swift build` y `swift test` corren en verde**: 40 tests, 0 fallas, en
-`RunCoachCore` (usando `scripts/setup-swift-env.ps1` para cargar el entorno
-de VS + `SDKROOT`). Cobertura actual:
-
-- `MovingAverageTests` (3), `GeoDistanceTests` (3), `HeartRateTrendTests`
-  (4): utilidades de métricas.
-- `RunStateTests` (12): FC suavizada, tendencia de FC, distancia, ritmo,
-  splits.
-- `ScenarioSegmentTests` (4): interpolación lineal de ritmo/FC.
-- `ScenarioSimulatorTests` (5): generación de muestras, pérdida de señal,
-  anomalías.
-- `MockSourceTests` (4): reproducción de fuentes simuladas hacia
-  `RunState`.
-- `ReferenceScenarioTests` (5): el escenario de referencia de 20 minutos
-  de punta a punta — duración, distancia/splits plausibles, y tendencia de
-  FC correcta en cada fase (estable → subiendo → bajando).
-
-Bugs reales encontrados y corregidos durante la implementación:
-
-- **Fase 2**: `elapsedSeconds` se actualizaba *después* de chequear si
-  correspondía generar un split, así que el split quedaba con la duración
-  de la muestra anterior en vez de la actual.
-- **Fase 3**: ninguno — el diseño de integración a 1s con emisión
-  desacoplada funcionó a la primera una vez corregido el bug de Fase 2 (los
-  tests de distancia del simulador dependen de la misma lógica de
-  `RunState`).
+Sin cambios respecto a Fase 3: **40 tests, 0 fallas**, en `RunCoachCore`.
+Fase 4 no agregó lógica a `RunCoachCore` — solo el proyecto iOS, que no se
+puede testear en Windows (ver [docs/windows-development.md](docs/windows-development.md)).
 
 ## Build iOS
 
-No iniciado. `RunCoach-iOS/` existe como carpeta vacía preparada para la
-Fase 4 (Xcode project vía XcodeGen + CI en Codemagic). Sin Mac local, sin
-cuenta de Codemagic creada todavía, sin repo en GitHub todavía.
+**Preparado, sin ejecutar todavía.** Existe:
+
+- `RunCoach-iOS/project.yml` (XcodeGen): target `RunCoach`, dependencia
+  local a `RunCoachCore`, `deploymentTarget: 16.0`, permisos de ubicación/
+  Bluetooth/background modes declarados (placeholders para Fases 6-9).
+- `RunCoach-iOS/App/RunCoachApp.swift` + `ContentView.swift`: skeleton
+  mínimo de SwiftUI que instancia un `RunState()` de `RunCoachCore` — solo
+  para probar la integración del paquete, no es la UI real (Fase 5).
+- `RunCoach-iOS/Resources/Assets.xcassets/`: catálogo de assets mínimo con
+  un slot de `AppIcon` vacío (sin imagen todavía).
+- `codemagic.yaml` (raíz del repo): workflow `runcoach-ios-unsigned-build`
+  — instala XcodeGen, genera el proyecto, compila para iOS Simulator sin
+  firma (`CODE_SIGNING_ALLOWED=NO`). Sin publishing (no hay Apple Developer
+  account, eso es Fase 12).
+
+**Nada de esto se pudo validar realmente** porque no hay Mac local ni
+Codemagic conectado — la primera corrida real de CI queda pendiente de que
+Vicente complete las acciones de "Bloqueos".
 
 ## Decisiones tomadas
 
 Ver [docs/decisions.md](docs/decisions.md) para el detalle y motivos:
 
 1. Swift toolchain oficial de swift.org para Windows (no WSL2).
-2. Visual Studio 2022 Build Tools + Windows 11 SDK, requeridos por Swift
-   para enlazar en Windows; script `scripts/setup-swift-env.ps1` para
-   cargar el entorno en cada terminal nueva.
+2. Visual Studio 2022 Build Tools + Windows 11 SDK, con
+   `scripts/setup-swift-env.ps1` para cargar el entorno en cada terminal.
 3. Codemagic como CI macOS remoto (free tier 500 min/mes).
-4. XcodeGen para generar el proyecto Xcode de forma declarativa (no Tuist,
-   por simplicidad en esta etapa).
-5. WHOOP validado como fuente HR viable (con matiz: requiere activar "HR
-   Broadcast"); Polar Verity Sense / Scosche Rhythm24 como plan B.
-6. `HeartRateSource`/`LocationSource` con closures, no Combine (Combine no
-   existe en Windows/Linux).
-7. Timestamps como `TimeInterval` relativo (segundos desde el inicio de la
-   carrera), no `Date` — determinismo para tests y para el Simulation
-   Engine.
-8. Simulation Engine con reproducción síncrona e inmediata (sin
-   temporizador real) en `MockHeartRateSource`/`MockLocationSource` — el
-   ritmo en tiempo real para pruebas interactivas queda para cuando haga
-   falta (Fase 9+), sin necesidad de cambiar el protocolo.
+4. XcodeGen para generar el proyecto Xcode de forma declarativa.
+5. WHOOP validado como fuente HR viable (con matiz); Polar Verity Sense /
+   Scosche Rhythm24 como plan B.
+6. `HeartRateSource`/`LocationSource` con closures, no Combine.
+7. Timestamps como `TimeInterval` relativo, no `Date`.
+8. Simulation Engine con reproducción síncrona e inmediata en los Mock
+   sources.
+9. Bundle ID `com.vicente.runcoach` como placeholder hasta que exista una
+   cuenta de Apple Developer real (Fase 12).
+10. Primer build de CI sin firma (solo simulador) — no hay certificados
+    todavía, y no hacen falta para validar que el proyecto compila.
 
 ## Arquitectura
 
-Resumen en [docs/architecture.md](docs/architecture.md): RunCoachCore
-(Swift Package portable, testeable en Windows) + RunCoach-iOS (SwiftUI/
-CoreBluetooth/CoreLocation/AVFoundation, compilado solo en CI macOS). El
-motor de carrera nunca depende de la red; OpenAI se consulta solo ante
-eventos relevantes, de forma no bloqueante.
-
-**RunCoachCore implementado hasta ahora** (Fases 2-3):
-
-```
-RunCoachCore/Sources/RunCoachCore/
-├── Models/
-│   ├── HeartRateSample.swift
-│   ├── LocationSample.swift
-│   └── Split.swift
-├── Metrics/
-│   ├── MovingAverage.swift
-│   ├── GeoDistance.swift
-│   └── HeartRateTrend.swift
-├── Sources/
-│   ├── HeartRateSource.swift   (protocolo)
-│   └── LocationSource.swift    (protocolo)
-├── Simulation/
-│   ├── ScenarioAnomaly.swift
-│   ├── ScenarioSegment.swift
-│   ├── Scenario.swift          (incluye Scenario.referenceRun)
-│   ├── ScenarioSimulator.swift
-│   ├── MockHeartRateSource.swift
-│   └── MockLocationSource.swift
-└── RunState.swift              (motor de ingestión y estado)
-```
-
-Explícitamente **fuera de alcance de Fases 2-3** (quedan para más
-adelante): detección de eventos más allá de tendencia de FC (Fase 8),
-Coach Decision Engine (Fase 10).
+Resumen en [docs/architecture.md](docs/architecture.md). Sin cambios de
+fondo en Fase 4 — se agregó el proyecto iOS concreto sobre el diseño ya
+documentado (RunCoachCore portable + RunCoach-iOS específico de Apple).
 
 ## Hardware
 
-Investigación completada, **sin compras realizadas**. Resumen en
-[docs/hardware.md](docs/hardware.md):
-
-- WHOOP cumple el perfil BLE Heart Rate estándar (0x180D) si se activa "HR
-  Broadcast" en su app — contradice la suposición inicial de descartarlo.
-- Polar Verity Sense y Scosche Rhythm24 (brazaletes sin pantalla) lo cumplen
-  nativamente, sin configuración adicional — quedan como plan B.
-- Ninguna compra se recomienda ni se realiza hasta llegar a Fase 6/14 y
-  validar en la práctica.
+Sin cambios respecto a Fase 1. Ver [docs/hardware.md](docs/hardware.md).
+Sin compras realizadas.
 
 ## Riesgos identificados
 
 Ver tabla completa en [docs/architecture.md](docs/architecture.md#riesgos-identificados-fase-1).
-Los principales: justificación de ubicación en background ante App Review,
-verificación del perfil BLE antes de comprar hardware (ya mitigado por la
-investigación), consumo de minutos de Codemagic, control de costo/latencia
-de OpenAI (aún no aplica, Fase 11).
+Nuevo en Fase 4: el `codemagic.yaml` no pudo probarse antes de escribirse
+(sin Mac local) — es esperable necesitar 1-2 iteraciones una vez que corra
+en CI de verdad.
 
-## Archivos creados
+## Archivos creados (nuevos en Fase 4)
 
 ```
-CLAUDE.md
-PROJECT_STATUS.md
-README.md
-.gitignore
-.github/workflows/runcoachcore-tests.yml
-scripts/setup-swift-env.ps1
-RunCoachCore/Package.swift
-RunCoachCore/Sources/RunCoachCore/Models/HeartRateSample.swift
-RunCoachCore/Sources/RunCoachCore/Models/LocationSample.swift
-RunCoachCore/Sources/RunCoachCore/Models/Split.swift
-RunCoachCore/Sources/RunCoachCore/Metrics/MovingAverage.swift
-RunCoachCore/Sources/RunCoachCore/Metrics/GeoDistance.swift
-RunCoachCore/Sources/RunCoachCore/Metrics/HeartRateTrend.swift
-RunCoachCore/Sources/RunCoachCore/Sources/HeartRateSource.swift
-RunCoachCore/Sources/RunCoachCore/Sources/LocationSource.swift
-RunCoachCore/Sources/RunCoachCore/Simulation/ScenarioAnomaly.swift
-RunCoachCore/Sources/RunCoachCore/Simulation/ScenarioSegment.swift
-RunCoachCore/Sources/RunCoachCore/Simulation/Scenario.swift
-RunCoachCore/Sources/RunCoachCore/Simulation/ScenarioSimulator.swift
-RunCoachCore/Sources/RunCoachCore/Simulation/MockHeartRateSource.swift
-RunCoachCore/Sources/RunCoachCore/Simulation/MockLocationSource.swift
-RunCoachCore/Sources/RunCoachCore/RunState.swift
-RunCoachCore/Tests/RunCoachCoreTests/MovingAverageTests.swift
-RunCoachCore/Tests/RunCoachCoreTests/GeoDistanceTests.swift
-RunCoachCore/Tests/RunCoachCoreTests/HeartRateTrendTests.swift
-RunCoachCore/Tests/RunCoachCoreTests/RunStateTests.swift
-RunCoachCore/Tests/RunCoachCoreTests/ScenarioSegmentTests.swift
-RunCoachCore/Tests/RunCoachCoreTests/ScenarioSimulatorTests.swift
-RunCoachCore/Tests/RunCoachCoreTests/MockSourceTests.swift
-RunCoachCore/Tests/RunCoachCoreTests/ReferenceScenarioTests.swift
-docs/architecture.md
-docs/decisions.md
-docs/hardware.md
-docs/ios-build.md
-docs/openai.md
-docs/real-world-tests.md
-docs/testing.md
-docs/windows-development.md
+codemagic.yaml
+RunCoach-iOS/project.yml
+RunCoach-iOS/App/RunCoachApp.swift
+RunCoach-iOS/App/ContentView.swift
+RunCoach-iOS/Resources/Assets.xcassets/Contents.json
+RunCoach-iOS/Resources/Assets.xcassets/AppIcon.appiconset/Contents.json
 ```
+
+(Lista completa de archivos de fases anteriores sin cambios — ver el
+historial de este documento en `git log -p PROJECT_STATUS.md` si hace
+falta.)
 
 ## Git
 
-Repo local inicializado (`main`), `.gitignore` configurado, commits hechos
-para Fase 0/1, Fase 2 y Fase 3. Sin remoto en GitHub todavía (se conecta en
-Fase 4).
+Repo local con commits de Fase 0/1, Fase 2, Fase 3 y Fase 4. **Sin remoto
+en GitHub todavía** — es exactamente el bloqueo de esta fase.
 
 ## Próxima tarea
 
-Esperar confirmación explícita de Vicente ("Continuar con Fase 4") antes de
-empezar el proyecto iOS: `project.yml` (XcodeGen), `codemagic.yaml`,
-conectar un repo en GitHub (requiere que Vicente autorice/loguee la
-cuenta), y el primer build vacío validado en CI. Fase 4 es la primera que
-va a requerir intervención de Vicente (crear/loguear cuentas de GitHub y
-Codemagic).
+**Necesito una acción tuya para poder seguir con Fase 4** (crear el repo en
+GitHub y conectar Codemagic). Ver el mensaje de esta sesión para los pasos
+exactos. Una vez que:
+
+1. el repo esté en GitHub con este código pusheado, y
+2. Codemagic esté conectado a ese repo,
+
+le aviso para correr el primer build y corregir lo que haga falta. Recién
+ahí Fase 4 queda completa de verdad, y ahí sí espero tu "Continuar con Fase
+5" antes de tocar la UI real de SwiftUI.

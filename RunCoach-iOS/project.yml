@@ -1,0 +1,68 @@
+name: RunCoach
+
+options:
+  bundleIdPrefix: com.vicente.runcoach
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+# Dependencia local a RunCoachCore (Swift Package portable, ver
+# ../RunCoachCore). El target de la app solo depende de esto para su
+# lógica de dominio — todo lo específico de Apple vive acá.
+packages:
+  RunCoachCore:
+    path: ../RunCoachCore
+
+targets:
+  RunCoach:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - App
+      - Resources
+    dependencies:
+      - package: RunCoachCore
+    info:
+      properties:
+        CFBundleDisplayName: RunCoach
+        UILaunchScreen: {}
+        UIRequiredDeviceCapabilities: [armv7]
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        # Placeholders de las Fases 6-9 (BLE, GPS background, audio). Se
+        # ajustan cuando esas fases se implementen de verdad — están acá
+        # desde ya para que el proyecto compile con la forma final sin
+        # tener que reestructurar el target más adelante.
+        NSLocationWhenInUseUsageDescription: >-
+          RunCoach usa tu ubicación durante la carrera para calcular
+          distancia y ritmo.
+        NSLocationAlwaysAndWhenInUseUsageDescription: >-
+          RunCoach necesita ubicación en segundo plano para seguir
+          midiendo tu carrera con la pantalla bloqueada.
+        NSBluetoothAlwaysUsageDescription: >-
+          RunCoach usa Bluetooth para conectarse a tu sensor de
+          frecuencia cardíaca.
+        UIBackgroundModes:
+          - location
+          - bluetooth-central
+          - audio
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.vicente.runcoach
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1" # solo iPhone
+
+schemes:
+  RunCoach:
+    build:
+      targets:
+        RunCoach: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+    archive:
+      config: Release
