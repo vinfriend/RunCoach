@@ -17,8 +17,9 @@
   (CoreLocation) — validados solo por compilación en CI, sin hardware
   real todavía.
 
-**Fase 8** (Run Data Engine completo) — **implementada, pendiente de
-confirmar build de CI**. `RunSessionViewModel` ahora soporta modo real
+**Fase 8** (Run Data Engine completo) — **completada** (en el sentido de
+"compila"). Build de Codemagic para el commit `92a5c74` terminó `finished`
+sin pasos fallidos (1m 5s). `RunSessionViewModel` ahora soporta modo real
 (`.real`) además del simulado: crea `BLEHeartRateSource` +
 `GPSLocationSource` con el **mismo** `Date` de referencia (resolviendo la
 nota pendiente de Fase 6) y alimenta el mismo `RunState`. `RunView` deja
@@ -61,9 +62,9 @@ nuevo vive en `RunCoach-iOS` (no testeable en Windows).
 
 ## Build iOS
 
-**Fases 4 a 7 validadas en CI real** (builds verdes). **Fase 8: pendiente
-de confirmar** — ver "Próxima tarea". Recordatorio permanente: un build
-verde solo confirma que compila, no que funcione con hardware real.
+**Fases 4 a 8 validadas en CI real** (todos los builds verdes).
+Recordatorio permanente: un build verde solo confirma que compila, no que
+funcione con hardware real.
 
 ### Qué se agregó en Fase 8
 
@@ -154,9 +155,6 @@ Repo en GitHub: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/Run
 
 ## Próxima tarea
 
-Confirmar con Vicente el build de Codemagic para el commit de Fase 8 (hay
-que iniciarlo a mano). Si pasa, Fase 8 queda completa en el sentido de
-"compila". Después, esperar "Continuar con Fase 9" (Audio Coach) de
-Vicente — ahí entra `AVSpeechSynthesizer` para que la app empiece a
-hablar, aunque todavía sin nada inteligente que decir (eso es Fase 10, el
-Coach Decision Engine).
+Esperar "Continuar con Fase 9" (Audio Coach) de Vicente — ahí entra
+`AVSpeechSynthesizer` para que la app empiece a hablar, aunque todavía sin
+nada inteligente que decir (eso es Fase 10, el Coach Decision Engine).
