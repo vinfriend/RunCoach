@@ -11,10 +11,16 @@
 **Fase 2** (RunCoachCore: modelos, métricas, `RunState`) — **completada**.
 **Fase 3** (Simulation Engine) — **completada**.
 **Fase 4** (Proyecto iOS + CI macOS) — **completada**.
-**Fase 5** (UI SwiftUI) — **implementada, pendiente de confirmar en CI**
-(ver "Build iOS" abajo — el commit que la sube dispara un build nuevo en
-Codemagic, pero **no se puede verificar visualmente sin Mac/iPhone**; el CI
-solo confirma que compila, no que la UI se vea o funcione bien).
+**Fase 5** (UI SwiftUI) — **completada**. Build de Codemagic para el commit
+`58b7a87` terminó `finished` sin pasos fallidos (1m 22s) — confirma que
+compila. **Nota importante**: "compila en CI" no es lo mismo que "se ve o
+funciona bien" — nunca se corrió en un simulador/iPhone real (no hay Mac).
+Eso queda pendiente de las Fases 12-13.
+
+Nota de proceso: el trigger automático por `push` de Codemagic no disparó
+build para los últimos commits — hubo que iniciarlos a mano desde el
+dashboard ("Start new build"). Puede ser una configuración de webhook a
+revisar más adelante si se vuelve molesto; por ahora no bloquea nada.
 
 ## Último commit estable
 
@@ -49,17 +55,11 @@ en `RunCoach-iOS`, que no se puede testear en Windows (ver
 
 ## Build iOS
 
-**Fase 4 validada en CI real** (build verde, ver historial de commits).
-**Fase 5 recién escrita — su build de CI todavía no se confirmó** al
-momento de cerrar esta sesión de trabajo. Antes de asumir que Fase 5 está
-completa, hay que:
-
-1. Confirmar que el build de Codemagic para el commit de Fase 5 terminó en
-   verde (mismo procedimiento que en Fase 4: mirar el dashboard).
-2. Tener en cuenta que un build verde en Codemagic **solo confirma que
-   compila** — no que la UI se vea bien, que la navegación funcione, o que
-   el timing de la simulación sea razonable. Eso requiere correrlo en un
-   simulador o iPhone real, que todavía no tenemos (Fases 12-13).
+**Fase 4 y Fase 5 validadas en CI real** (ambos builds verdes). Recordar
+siempre: un build verde en Codemagic **solo confirma que compila** — no
+que la UI se vea bien, que la navegación funcione, o que el timing de la
+simulación sea razonable. Eso requiere correrlo en un simulador o iPhone
+real, que todavía no tenemos (Fases 12-13).
 
 ### Qué se agregó en Fase 5
 
@@ -150,9 +150,7 @@ Repo en GitHub: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/Run
 
 ## Próxima tarea
 
-**Antes de seguir**: confirmar el resultado del build de Codemagic para el
-commit de Fase 5 (pedirle a Vicente que lo revise, igual que en Fase 4). Si
-falla, corregir. Si pasa, Fase 5 queda completa — pero con la salvedad de
-que sigue sin haberse *visto* funcionando en un dispositivo/simulador real,
-solo compilada. Recién con eso resuelto espero el "Continuar con Fase 6"
-(BLE) de Vicente.
+Esperar confirmación explícita de Vicente ("Continuar con Fase 6") antes de
+empezar BLE real (`BLEHeartRateSource` con CoreBluetooth, contra el
+Heart Rate Service estándar 0x180D investigado en Fase 1). Recordar que
+sigue sin poder probarse con hardware real hasta las Fases 12-14.
