@@ -130,6 +130,23 @@ Windows.
   detalle completo del diseño y cómo se cumple cada requisito no
   negociable (timeout, fallback, retry prudente, control de costo).
 
+**Implementado (Fase 19 — historial, adelantada porque no depende de
+firma/hardware):**
+
+- **`CompletedRun`** (`History/`): resumen `Codable` de una carrera
+  terminada — duración, distancia, FC promedio (nuevo
+  `RunState.averageHeartRateBPM`, distinto de `smoothedHeartRateBPM`),
+  splits. `startedAt` es un `Date` real (no relativo) a propósito: acá
+  importa cuándo pasó de verdad, no reproducibilidad.
+- **`RunHistoryStore`**: persiste `CompletedRun`s como JSON en un
+  directorio, vía `FileManager` — parte de Foundation, disponible en
+  Windows/Linux, así que esto se testea de verdad (10 tests, incluyendo
+  E/S real a disco con directorios temporales). La decisión de *qué*
+  directorio real usar en el iPhone (`Documents/RunHistory`) vive en
+  `RunCoach-iOS` (`RunHistoryStore.documentsStore()`), no acá.
+- `Split` ahora es `Codable` (antes solo `Equatable`/`Sendable`) —
+  necesario para que `CompletedRun` se pueda serializar.
+
 **Pendiente (fases futuras):**
 
 - **Detección de eventos** más allá de la tendencia de FC: desviación de
@@ -236,6 +253,27 @@ la API key, guardada solo en el Keychain de ese iPhone.
 Ver [docs/openai.md](openai.md) para el diseño completo. Sin validar
 contra la API real — no hay API key creada para este proyecto todavía (eso
 requiere autorización explícita de Vicente, nunca autónomo).
+
+**Implementado (Fase 19 — Historial, adelantada saltando Fases 12-18):**
+
+Vicente decidió no pagar la membresía de Apple Developer todavía — Fases
+12-18 (firma, TestFlight, hardware físico) quedan bloqueadas hasta que la
+cree. Fase 19 (historial) no depende de nada de eso, así que se adelantó.
+
+- `RunHistoryStore.documentsStore()` (`App/History/`): la única pieza que
+  decide *dónde* vive el historial en el iPhone de verdad
+  (`Documents/RunHistory`) — el store en sí (RunCoachCore) es agnóstico.
+- `RunHistoryViewModel`: carga/borra carreras para `HistoryView`.
+- `HistoryView`: ya no es un placeholder — lista real con fecha, duración,
+  distancia, FC promedio, cantidad de splits, y borrado con swipe.
+- `RunSessionViewModel.finishRun()`: arma un `CompletedRun` y lo guarda al
+  terminar cualquier carrera (parada a mano, o fin natural de la
+  simulación) — se llama tanto desde `stop()` como desde `scheduleEnd`.
+
+Igual que el resto de `RunCoach-iOS`, esto compila en CI pero nunca se vio
+corriendo — sin Mac no hay forma de confirmar que la lista se ve bien o
+que el borrado funciona de verdad, más allá de que la lógica de
+persistencia (RunCoachCore) sí está sólidamente testeada.
 
 ## HeartRateSource: independencia de marca
 

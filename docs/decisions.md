@@ -477,3 +477,60 @@ frase fija en español. Modelar esto con `throws` hubiera obligado a un
 Mantiene además el requisito de "la red nunca bloquea ni rompe nada": no
 hay ningún camino de código donde una falla de OpenAI se propague como un
 error visible para el usuario.
+
+---
+
+## 2026-08-12 — Saltar Fases 12-18, adelantar Fase 19
+
+**Decisión**: Vicente pidió explícitamente no pagar la membresía de Apple
+Developer todavía. Fases 12 (firma), 13 (TestFlight), 14 (sensor físico),
+15 (GPS/background real), 16 (integración completa con hardware), 17
+(prueba real corta) y 18 (correcciones) dependen todas, directa o
+indirectamente, de tener una cuenta de Apple Developer y/o un iPhone
+físico — así que quedan bloqueadas sin excepción. En vez de parar el
+proyecto, se adelantó la Fase 19 (historial y análisis post-carrera), que
+no depende de ninguna de las dos cosas.
+
+**Motivo**: el roadmap original ordena las fases de una forma razonable
+para el caso general, pero no hay una dependencia técnica real entre Fase
+19 y las Fases 12-18 — el historial es persistencia local de datos que
+`RunCoachCore` ya calcula, no necesita firma ni hardware. Parar todo el
+proyecto en seco por un bloqueo de pago hubiera sido un desperdicio de
+tiempo evitable.
+
+**Impacto**: el roadmap deja de ser estrictamente secuencial a partir de
+acá. Cuando Vicente decida pagar la membresía, hay que retomar en Fase 12
+donde quedó (ver docs/ios-build.md), no reordenar lo que ya se hizo.
+
+**Alternativas consideradas**: esperar sin avanzar nada — descartada por
+instrucción explícita de Vicente ("continuá todo lo que sea posible sin
+la membresía").
+
+---
+
+## 2026-08-12 — Fase 19: historial persistido como archivos JSON, no una base de datos
+
+**Decisión**: `RunHistoryStore` guarda cada `CompletedRun` como un
+archivo `.json` individual en un directorio (nombrado por su `id`), leído
+con `FileManager` — no SwiftData, Core Data, ni SQLite.
+
+**Motivo**: para el volumen esperado (carreras personales, capaz unas
+pocas por semana), un archivo por carrera es simple, fácil de inspeccionar
+a mano si hace falta debuggear, y no agrega una dependencia de framework
+nueva. Es además lo que permite testear la persistencia real en Windows
+(`FileManager` es parte de Foundation, portable) — SwiftData/Core Data son
+exclusivos de Apple y hubieran quedado, otra vez, sin poder probarse sin
+Mac.
+
+**Alternativas consideradas**: SwiftData (la opción "moderna" de Apple,
+iOS 17+, pero nuestro deployment target es iOS 16) y Core Data (más
+código repetitivo para un caso de uso tan simple, y tampoco portable a
+Windows para tests). Si el historial creciera mucho en volumen o
+complejidad de consultas, valdría la pena reconsiderar — no es el caso
+todavía.
+
+**`startedAt` es un `Date` real, no `TimeInterval` relativo**: a
+diferencia de `HeartRateSample`/`LocationSample` (Fase 2, relativos a
+propósito para determinismo), acá lo que importa es la fecha/hora real en
+que pasó la carrera — no hay ninguna razón para ocultar eso detrás de un
+offset relativo.

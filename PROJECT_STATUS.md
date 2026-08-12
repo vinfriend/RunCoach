@@ -6,34 +6,42 @@
 
 ## Fase actual
 
-**Fases 0 a 10** — **completadas**. Resumen rápido:
+**Fases 0 a 11** — **completadas**. Resumen rápido:
 
 - **0-1**: entorno Windows listo, arquitectura e investigación.
 - **2-3**: `RunCoachCore` (modelos, métricas, `RunState`, Simulation
-  Engine) — 40 tests.
+  Engine).
 - **4-5**: proyecto iOS + CI en Codemagic, UI SwiftUI con carrera simulada.
 - **6-7**: `BLEHeartRateSource`/`GPSLocationSource` — solo compilación en
-  CI. `HeartRateMeasurementParser` testeado en Windows (8 tests).
+  CI. `HeartRateMeasurementParser` testeado en Windows.
 - **8**: modo real (BLE+GPS con `Date` de referencia compartido) conectado
   a la UI.
 - **9**: `AudioCoach` (voz `es-AR`) anuncia eventos mecánicos.
-- **10**: `CoachDecisionEngine` — la pieza central, decide cuándo hablar
-  (11 tests, incluyendo un bug real corregido — ver docs/decisions.md).
+- **10**: `CoachDecisionEngine` — la pieza central, decide cuándo hablar.
+- **11**: integración con OpenAI (armado/parseo portable, cliente real
+  con timeout/retry). Sin API key configurada todavía.
 
-**Fase 11** (OpenAI) — **completada** (en el sentido de "compila"). Mismo
-patrón que Fase 6 (BLE): la lógica de armado/parseo de requests vive en
-`RunCoachCore` (**73 tests en total**), el cliente HTTP real vive en
-`RunCoach-iOS`. Sin API key configurada todavía.
+**Fase 12** (Apple Developer / firma) — **bloqueada indefinidamente por
+decisión de Vicente**: no quiere pagar la membresía todavía. Fases 13-18
+(TestFlight, sensor físico, GPS/background real, integración con
+hardware, prueba real, correcciones) dependen todas de Fase 12 — quedan
+bloqueadas también. Ver [docs/ios-build.md](docs/ios-build.md#fase-12--apple-developer--firma)
+para el plan completo, listo para retomar cuando Vicente decida.
 
-**Fase 12** (Apple Developer / firma) — **bloqueada esperando a
-Vicente**. Primera fase gateada casi por completo por una acción suya:
-inscribirse en el Apple Developer Program (USD 99/año, pago +
-verificación de identidad, 1-3 días de aprobación) y, una vez aprobado,
-crear una API key de App Store Connect para que Codemagic pueda firmar
-automáticamente. Ver [docs/ios-build.md](docs/ios-build.md#fase-12--apple-developer--firma)
-para el plan completo investigado. No hay nada que yo pueda avanzar acá
-sin esa cuenta — ver el mensaje de esta sesión para la acción exacta que
-le pedí a Vicente.
+**Fase 19** (Historial y análisis post-carrera) — **adelantada y
+completada** (en el sentido de "compila"; la parte de `RunCoachCore` está
+testeada de verdad). No depende de firma ni de hardware, así que se
+adelantó salteando 12-18 por instrucción explícita de Vicente
+("continuá todo lo que sea posible sin la membresía"). Ver
+docs/decisions.md para el razonamiento completo de por qué el roadmap deja
+de ser estrictamente secuencial acá.
+
+- `CompletedRun`/`RunHistoryStore` (RunCoachCore): persistencia real a
+  disco vía `FileManager` — **93 tests en total, 10 nuevos**, incluyendo
+  E/S real con directorios temporales en Windows.
+- `HistoryView` ya no es un placeholder: lista real, con borrado, de
+  carreras guardadas.
+- Cada carrera (simulada o real) que termina se guarda automáticamente.
 
 Nota de proceso (desde Fase 5): el trigger automático por `push` de
 Codemagic no dispara solo — hay que iniciar el build a mano desde el
@@ -45,10 +53,11 @@ Ver `git log --oneline -1` para el hash exacto.
 
 ## Bloqueos
 
-- **Fase 12 bloqueada esperando que Vicente se inscriba en el Apple
-  Developer Program.** No es algo que yo pueda hacer ni acelerar — pago,
-  verificación de identidad, y una aprobación de Apple que toma 1-3 días.
-  Ver [docs/ios-build.md](docs/ios-build.md#fase-12--apple-developer--firma).
+- **Fases 12-18 bloqueadas por decisión de Vicente** (no técnica): no
+  quiere pagar la membresía de Apple Developer Program todavía. No es
+  algo que yo deba insistir en resolver — el plan queda documentado y
+  listo para cuando él decida. Ver
+  [docs/ios-build.md](docs/ios-build.md#fase-12--apple-developer--firma).
 - La falta de API key de OpenAI (Fase 11) no bloquea nada — la app
   funciona igual sin ella, solo sin recomendaciones enriquecidas.
 
@@ -70,55 +79,54 @@ Detalle completo en [docs/windows-development.md](docs/windows-development.md).
 
 ## Tests en Windows
 
-**73 tests, 0 fallas**, en `RunCoachCore`:
+**93 tests, 0 fallas**, en `RunCoachCore`:
 
 - Fases 2-3 (40): modelos, métricas, `RunState`, Simulation Engine.
 - Fase 6 (8): `HeartRateMeasurementParser` — parsing GATT del Heart Rate
   Service.
 - Fase 10 (11): `CoachEventDetector`, `CoachDecisionEngine`, escenario
   completo de 20 minutos.
-- Fase 11 (14): `OpenAICoachRequestBuilderTests` (7) — forma del JSON,
-  contenido del prompt según el evento; `OpenAICoachResponseParserTests`
-  (7) — respuestas válidas, malformadas, vacías.
+- Fase 11 (14): request builder y response parser de OpenAI.
+- Fase 19 (10): `CompletedRunTests` (2), `RunHistoryStoreTests` (6) — save/
+  load/delete/orden/resiliencia ante archivos corruptos —, más 2 nuevos en
+  `RunStateTests` para `averageHeartRateBPM`.
 
 ## Build iOS
 
-**Fases 4 a 11 validadas en CI real** (todos los builds verdes).
+**Fases 4 a 11 validadas en CI real** (todos los builds verdes). **Fase
+19: pendiente de confirmar** — ver "Próxima tarea".
 
-### Qué se agregó en Fase 11
+### Qué se agregó en Fase 19
 
 **En `RunCoachCore` (testeado en Windows):**
 
-- `CoachEventSummary`: snapshot estructurado del `RunState` en el
-  instante de la decisión (no las muestras crudas).
-- `OpenAIChatMessage`/`OpenAIChatRequest`/`OpenAIChatResponse`: tipos
-  `Codable` que reflejan el formato de OpenAI Chat Completions.
-- `OpenAICoachRequestBuilder`: arma el prompt (system + user) — modelo
-  `gpt-4o-mini`, `max_tokens: 60` (control de costo deliberado).
-- `OpenAICoachResponseParser`: decodifica la respuesta en un
-  `CoachRecommendation`, `nil` ante cualquier forma inesperada.
+- `RunState.averageHeartRateBPM`: promedio de FC de toda la carrera
+  (distinto de `smoothedHeartRateBPM`, que es una media móvil reciente).
+- `Split` ahora es `Codable` (antes solo `Equatable`/`Sendable`).
+- `CompletedRun`: resumen `Codable` de una carrera terminada — duración,
+  distancia, FC promedio, splits, `startedAt` como `Date` real (no
+  relativo, a diferencia de `HeartRateSample`/`LocationSample`).
+- `RunHistoryStore`: persiste `CompletedRun`s como JSON, un archivo por
+  carrera, vía `FileManager` (portable — no SwiftData/Core Data). Testeado
+  con directorios temporales reales en Windows.
 
-**En `RunCoach-iOS` (solo compilado, no verificado — sin API key ni Mac):**
+**En `RunCoach-iOS` (solo compilado, no verificado — sin Mac):**
 
-- `OpenAIAPIKeyStore`: Keychain, `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`.
-- `OpenAICoachClient`: `URLSession` con timeout de 5s y **un** reintento
-  prudente (solo ante fallas transitorias: timeout, sin conexión, 429,
-  5xx — nunca ante 401 o JSON inesperado). Nunca lanza: cualquier falla
-  colapsa a `nil`.
-- `RunSessionViewModel`: al decidir `.speak(event)`, lanza un `Task`
-  aparte que intenta OpenAI y cae a la frase fija si no hay respuesta a
-  tiempo.
-- `SettingsView`: campo real (ya no placeholder) para pegar la API key.
+- `RunHistoryStore.documentsStore()`: decide el directorio real
+  (`Documents/RunHistory`) — la única parte específica de iOS.
+- `RunHistoryViewModel`: carga/borra carreras para la UI.
+- `HistoryView`: lista real con fecha, duración, distancia, FC promedio,
+  cantidad de splits, y borrado con swipe.
+- `RunSessionViewModel.finishRun()`: guarda la carrera al terminar
+  (parada a mano o fin natural de la simulación).
 
-### Qué NO se hizo en Fase 11 (a propósito)
+### Qué NO se hizo en Fase 19 (a propósito)
 
-- Nada de voz conversacional ni Realtime API — sigue siendo texto → TTS
-  local, tal como pedía el prompt original.
-- Sin control de cuota/presupuesto explícito más allá de lo que ya acota
-  `CoachDecisionEngine` — no hace falta más para un proyecto personal en
-  esta etapa.
-- Sin telemetría de latencia/costo real — no se puede medir sin una API
-  key real y sin correr la app de verdad.
+- Sin gráficos ni análisis visual de splits — solo texto, por ahora.
+- Sin exportar/compartir carreras (a Strava, como archivo, etc.) — no
+  estaba pedido.
+- Sin límite de cuántas carreras se guardan — no hace falta para el
+  volumen de un proyecto personal.
 
 ## Decisiones tomadas
 
@@ -132,7 +140,8 @@ Ver [docs/decisions.md](docs/decisions.md) para el detalle y motivos:
 5. WHOOP validado como fuente HR viable (con matiz); Polar Verity Sense /
    Scosche Rhythm24 como plan B.
 6. `HeartRateSource`/`LocationSource` con closures, no Combine.
-7. Timestamps como `TimeInterval` relativo, no `Date`.
+7. Timestamps como `TimeInterval` relativo, no `Date` (excepto en
+   `CompletedRun.startedAt`, Fase 19 — ver decisión #24).
 8. Simulation Engine con reproducción síncrona e inmediata en los Mock
    sources.
 9. Bundle ID `com.vicente.runcoach` como placeholder hasta Fase 12.
@@ -157,19 +166,22 @@ Ver [docs/decisions.md](docs/decisions.md) para el detalle y motivos:
 20. `OpenAICoachClient` reintenta una sola vez, solo ante fallas
     transitorias (no ante 401 ni JSON inesperado).
 21. "Sin recomendación" (`nil`) es un resultado válido de
-    `OpenAICoachClient`, nunca un error que se propague — simplifica el
-    llamador y refuerza que la red nunca bloquea nada.
+    `OpenAICoachClient`, nunca un error que se propague.
 22. Firma automática vía API key de App Store Connect en Codemagic (Fase
-    12), en vez de exportar/subir certificados `.p12` a mano — más simple
-    y es el método que recomienda la documentación de Codemagic.
+    12, sin implementar todavía).
+23. **Saltar Fases 12-18, adelantar Fase 19** — por instrucción explícita
+    de Vicente de no pagar Apple Developer todavía. El roadmap deja de
+    ser estrictamente secuencial a partir de acá.
+24. Historial persistido como archivos JSON (`FileManager`), no
+    SwiftData/Core Data — portable, testeable en Windows, suficiente para
+    el volumen de un proyecto personal.
 
 ## Arquitectura
 
-Resumen en [docs/architecture.md](docs/architecture.md). Con Fase 11, el
-flujo completo previsto desde el prompt original ya existe en código:
-datos → RunState → Coach Decision Engine → resumen estructurado → OpenAI
-→ recomendación → voz. Falta la firma/distribución (Fases 12-13) para
-poder probarlo de verdad en un iPhone.
+Resumen en [docs/architecture.md](docs/architecture.md). El flujo
+principal (datos → RunState → Coach Decision Engine → OpenAI → voz) está
+completo desde Fase 11. Fase 19 le agrega persistencia — la app ya no
+"olvida" cada carrera al cerrarse.
 
 ## Hardware
 
@@ -179,25 +191,26 @@ Sin compras realizadas.
 ## Riesgos identificados
 
 Ver tabla completa en [docs/architecture.md](docs/architecture.md#riesgos-identificados-fase-1).
-`OpenAICoachClient` hereda el mismo riesgo de "código nunca antes
-ejecutado" que BLE/GPS/Audio — agravado porque ni siquiera hay una API
-key para probarlo cuando llegue el momento de tener un iPhone. La parte de
-`RunCoachCore` (request/response), en cambio, está sólidamente testeada.
+Sin cambios nuevos de fondo. La parte de persistencia (Fase 19,
+`RunCoachCore`) es de las más sólidamente testeadas del proyecto — a
+diferencia de BLE/GPS/Audio/OpenAI, acá la lógica completa (guardar, leer,
+ordenar, borrar, tolerar archivos corruptos) corre de verdad en cada
+`swift test`, no solo compila.
 
-## Archivos creados/modificados (Fase 11)
+## Archivos creados/modificados (Fase 19)
 
 ```
-RunCoachCore/Sources/RunCoachCore/OpenAI/CoachEventSummary.swift            (nuevo)
-RunCoachCore/Sources/RunCoachCore/OpenAI/OpenAIChatModels.swift             (nuevo)
-RunCoachCore/Sources/RunCoachCore/OpenAI/OpenAICoachRequestBuilder.swift    (nuevo)
-RunCoachCore/Sources/RunCoachCore/OpenAI/OpenAICoachResponseParser.swift    (nuevo)
-RunCoachCore/Sources/RunCoachCore/OpenAI/CoachRecommendation.swift          (nuevo)
-RunCoachCore/Tests/RunCoachCoreTests/OpenAICoachRequestBuilderTests.swift   (nuevo)
-RunCoachCore/Tests/RunCoachCoreTests/OpenAICoachResponseParserTests.swift   (nuevo)
-RunCoach-iOS/App/OpenAI/OpenAIAPIKeyStore.swift                             (nuevo)
-RunCoach-iOS/App/OpenAI/OpenAICoachClient.swift                             (nuevo)
-RunCoach-iOS/App/ViewModels/RunSessionViewModel.swift                       (modificado)
-RunCoach-iOS/App/Views/SettingsView.swift                                   (modificado)
+RunCoachCore/Sources/RunCoachCore/History/CompletedRun.swift        (nuevo)
+RunCoachCore/Sources/RunCoachCore/History/RunHistoryStore.swift     (nuevo)
+RunCoachCore/Sources/RunCoachCore/Models/Split.swift                (modificado: + Codable)
+RunCoachCore/Sources/RunCoachCore/RunState.swift                    (modificado: + averageHeartRateBPM)
+RunCoachCore/Tests/RunCoachCoreTests/CompletedRunTests.swift        (nuevo)
+RunCoachCore/Tests/RunCoachCoreTests/RunHistoryStoreTests.swift     (nuevo)
+RunCoachCore/Tests/RunCoachCoreTests/RunStateTests.swift            (modificado)
+RunCoach-iOS/App/History/RunHistoryStore+Documents.swift            (nuevo)
+RunCoach-iOS/App/History/RunHistoryViewModel.swift                  (nuevo)
+RunCoach-iOS/App/Views/HistoryView.swift                            (reescrito)
+RunCoach-iOS/App/ViewModels/RunSessionViewModel.swift                (modificado)
 ```
 
 ## Git
@@ -207,10 +220,13 @@ Repo en GitHub: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/Run
 
 ## Próxima tarea
 
-Esperando que Vicente complete el Paso 1 de
-[docs/ios-build.md#fase-12](docs/ios-build.md#fase-12--apple-developer--firma):
-inscribirse en el Apple Developer Program. Cuando esté aprobado (1-3
-días), me pasa el Team ID y seguimos con el Paso 2 (API key de App Store
-Connect → Codemagic) y el Paso 3 (actualizar `project.yml`/`codemagic.yaml`
-para firma automática).
+Confirmar con Vicente el build de Codemagic para el commit de Fase 19
+(hay que iniciarlo a mano). Si pasa, Fase 19 queda completa.
 
+Después: no hay más fases avanzables sin firma/hardware según el roadmap
+original. Opciones para cuando Vicente quiera seguir:
+
+1. Retomar Fase 12 (pagar Apple Developer) cuando decida.
+2. Pedir trabajo adicional dentro de lo ya alcanzable sin cuenta/hardware
+   (pulir UI, más tests, mejoras al Coach Decision Engine, etc.) — a
+   definir con Vicente, no asumir.

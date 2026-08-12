@@ -18,6 +18,25 @@ final class RunStateTests: XCTestCase {
         XCTAssertEqual(state.smoothedHeartRateBPM, 150)
     }
 
+    func testAverageHeartRateIsNilBeforeAnySample() {
+        let state = RunState()
+        XCTAssertNil(state.averageHeartRateBPM)
+    }
+
+    func testAverageHeartRateCoversWholeRunNotJustRecentWindow() {
+        // A diferencia de smoothedHeartRateBPM (ventana chica), esto
+        // promedia TODAS las muestras, aunque la ventana de suavizado
+        // sea mucho más chica que la cantidad de muestras ingeridas.
+        let state = RunState(heartRateWindowSize: 2)
+        state.ingest(heartRate: HeartRateSample(bpm: 100, timestamp: 0))
+        state.ingest(heartRate: HeartRateSample(bpm: 200, timestamp: 10))
+        state.ingest(heartRate: HeartRateSample(bpm: 150, timestamp: 20))
+        // Promedio de las 3: (100+200+150)/3 = 150. La ventana suavizada
+        // (últimas 2) daría (200+150)/2 = 175 — distinto a propósito.
+        XCTAssertEqual(state.averageHeartRateBPM, 150)
+        XCTAssertEqual(state.smoothedHeartRateBPM, 175)
+    }
+
     func testHeartRateTrendIsStableWithoutEnoughHistory() {
         let state = RunState()
         state.ingest(heartRate: HeartRateSample(bpm: 140, timestamp: 0))

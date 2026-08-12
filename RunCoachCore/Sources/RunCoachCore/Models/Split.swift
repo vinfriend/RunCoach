@@ -3,7 +3,7 @@ import Foundation
 /// Un segmento de carrera completado (por defecto, cada 1000m), con sus
 /// métricas promedio. `RunState` genera uno cada vez que se cruza el umbral
 /// de distancia configurado.
-public struct Split: Equatable, Sendable {
+public struct Split: Equatable, Sendable, Codable {
     public let index: Int
     public let distanceMeters: Double
     public let durationSeconds: TimeInterval

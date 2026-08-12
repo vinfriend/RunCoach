@@ -44,6 +44,11 @@ enum RunMode: Equatable {
 /// cae de vuelta a la frase fija en español de siempre. La traducción a
 /// texto del fallback vive acá (capa de presentación), no en
 /// `RunCoachCore`.
+///
+/// **Historial (Fase 19)**: al terminar una carrera (parada a mano o
+/// finalización natural de la simulación), se arma un `CompletedRun` y se
+/// guarda con `RunHistoryStore` — sin esperar a tener firma/hardware real,
+/// esto ya se puede probar en CI (aunque no verlo — ver docs/decisions.md).
 final class RunSessionViewModel: ObservableObject {
     @Published private(set) var isRunning = false
     @Published private(set) var mode: RunMode?
@@ -65,6 +70,8 @@ final class RunSessionViewModel: ObservableObject {
     private var pendingWorkItems: [DispatchWorkItem] = []
     private let audioCoach = AudioCoach()
     private let openAIClient = OpenAICoachClient()
+    private let historyStore = RunHistoryStore.documentsStore()
+    private var runStartedAt: Date?
 
     // Modo real
     private var heartRateSource: BLEHeartRateSource?
@@ -82,6 +89,7 @@ final class RunSessionViewModel: ObservableObject {
         isRunning = true
         runState = RunState()
         coachDecisionEngine = CoachDecisionEngine()
+        runStartedAt = Date()
         audioCoach.speak("Carrera simulada iniciada.")
 
         let heartRateSamples = ScenarioSimulator.generateHeartRateSamples(for: scenario)
@@ -106,6 +114,7 @@ final class RunSessionViewModel: ObservableObject {
         isRunning = true
         runState = RunState()
         coachDecisionEngine = CoachDecisionEngine()
+        runStartedAt = Date()
         audioCoach.speak("Carrera iniciada.")
 
         // Mismo Date de referencia para ambas fuentes — ver el comentario
@@ -141,6 +150,10 @@ final class RunSessionViewModel: ObservableObject {
         pendingWorkItems.forEach { $0.cancel() }
         pendingWorkItems.removeAll()
 
+        if wasRunning {
+            finishRun()
+        }
+
         heartRateSource?.stop()
         locationSource?.stop()
         heartRateSource = nil
@@ -152,6 +165,17 @@ final class RunSessionViewModel: ObservableObject {
         if wasRunning {
             audioCoach.speak("Carrera detenida.")
         }
+    }
+
+    /// Arma un `CompletedRun` con el estado final de la carrera y lo
+    /// guarda en el historial (Fase 19). Se llama tanto al parar a mano
+    /// (`stop()`, mientras `mode`/`runStartedAt` todavía están seteados)
+    /// como al terminar naturalmente la simulación (`scheduleEnd`).
+    private func finishRun() {
+        guard let mode, let runStartedAt else { return }
+        let modeTag = mode == .simulated ? "simulated" : "real"
+        let completedRun = CompletedRun.make(mode: modeTag, startedAt: runStartedAt, runState: runState)
+        try? historyStore.save(completedRun)
     }
 
     private func scheduleHeartRateSamples(_ samples: [HeartRateSample]) {
@@ -181,6 +205,7 @@ final class RunSessionViewModel: ObservableObject {
     private func scheduleEnd(after delay: TimeInterval) {
         let item = DispatchWorkItem { [weak self] in
             guard let self else { return }
+            self.finishRun()
             self.isRunning = false
             self.audioCoach.speak("Carrera simulada finalizada.")
         }

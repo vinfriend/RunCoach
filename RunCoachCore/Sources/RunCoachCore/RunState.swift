@@ -97,6 +97,15 @@ public final class RunState {
         heartRateMovingAverage.value
     }
 
+    /// Promedio de FC de toda la carrera hasta ahora (no una media móvil
+    /// reciente como `smoothedHeartRateBPM`) — pensado para resúmenes
+    /// post-carrera (Fase 19), no para decisiones en tiempo real.
+    public var averageHeartRateBPM: Double? {
+        guard !heartRateSamples.isEmpty else { return nil }
+        let total = heartRateSamples.reduce(0) { $0 + $1.bpm }
+        return Double(total) / Double(heartRateSamples.count)
+    }
+
     /// Ritmo actual suavizado, en segundos por kilómetro.
     public var currentPaceSecondsPerKm: Double? {
         paceMovingAverage.value
