@@ -416,3 +416,64 @@ hablado, como `testFirstDetectedEventSpeaksImmediately`), pero
 `CoachDecisionEngine` nunca debe usar esa igualdad para deduplicar — debe
 usar `.kind`. Si se agregan más casos a `CoachEvent` en el futuro, hay que
 recordar extender `CoachEvent.Kind` en paralelo.
+
+---
+
+## 2026-08-12 — Fase 11: mismo patrón de Fase 6 para OpenAI (portable vs. red)
+
+**Decisión**: el request builder (`OpenAICoachRequestBuilder`) y el
+response parser (`OpenAICoachResponseParser`) — junto con los tipos
+`Codable` que reflejan el formato de la API — viven en `RunCoachCore`. El
+único componente que usa `URLSession` de verdad (`OpenAICoachClient`)
+vive en `RunCoach-iOS`.
+
+**Motivo**: armar un JSON de request y parsear uno de response es lógica
+pura, sin ninguna dependencia de red — exactamente el mismo tipo de
+separación que funcionó bien en Fase 6 (`HeartRateMeasurementParser` en
+RunCoachCore, `CBCentralManager` en RunCoach-iOS). El resultado es que la
+parte más propensa a bugs sutiles (¿el JSON tiene la forma correcta?,
+¿qué pasa si la respuesta viene vacía o mal formada?) quedó cubierta por
+14 tests reales en Windows, y solo la llamada HTTP en sí —imposible de
+probar sin API key ni Mac— queda sin verificar.
+
+**Impacto**: si en el futuro se cambia de proveedor de LLM o de forma de
+llamarlo, el 90% del código relevante (prompt, parsing, tipos) no se
+mueve de `RunCoachCore` y sigue siendo testeable sin tocar `RunCoach-iOS`.
+
+---
+
+## 2026-08-12 — Fase 11: reintento único, solo ante fallas transitorias
+
+**Decisión**: `OpenAICoachClient` reintenta la llamada a OpenAI **una
+sola vez**, con 1 segundo de espera, y solo si la falla fue transitoria
+(timeout, sin conexión, HTTP 429, HTTP 5xx). Ante un error de
+autenticación (401) o una respuesta que no se puede parsear, no
+reintenta — devuelve `nil` directamente.
+
+**Motivo**: el prompt original pide "retry prudente", explícitamente no
+agresivo. Reintentar un 401 nunca va a funcionar (la key sigue siendo
+inválida en el segundo intento) — solo agrega latencia antes de caer al
+fallback. Reintentar un timeout sí tiene sentido: puede ser una falla de
+red puntual.
+
+**Impacto en latencia**: peor caso (timeout + reintento con timeout de
+nuevo) son unos ~11 segundos antes de caer a la frase fija — aceptable
+para una recomendación de coaching que no es urgente por naturaleza
+(nunca es una alerta de seguridad).
+
+---
+
+## 2026-08-12 — Fase 11: "sin recomendación" es un resultado válido, no un error
+
+**Decisión**: `OpenAICoachClient.recommendation(for:)` devuelve
+`CoachRecommendation?` (opcional), nunca `throws`. Todos los casos de
+falla (sin API key, sin red, timeout, HTTP de error, JSON inesperado)
+colapsan al mismo resultado: `nil`.
+
+**Motivo**: quien llama (`RunSessionViewModel`) no necesita distinguir
+*por qué* falló — en todos los casos la acción es la misma, decir la
+frase fija en español. Modelar esto con `throws` hubiera obligado a un
+`do/catch` que de todas formas termina haciendo lo mismo en cada rama.
+Mantiene además el requisito de "la red nunca bloquea ni rompe nada": no
+hay ningún camino de código donde una falla de OpenAI se propague como un
+error visible para el usuario.

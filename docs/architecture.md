@@ -118,6 +118,18 @@ Windows.
   nunca hay dos candidatos simultáneos que priorizar. Se vuelve relevante
   con más detectores o con las recomendaciones de OpenAI (Fase 11).
 
+**Implementado (Fase 11 — OpenAI):**
+
+- **`CoachEventSummary`, `OpenAIChat*` (Codable), `OpenAICoachRequestBuilder`,
+  `OpenAICoachResponseParser`, `CoachRecommendation`** (`OpenAI/`): arman
+  el request y parsean la respuesta de OpenAI Chat Completions. Lógica
+  pura de texto/JSON, sin `URLSession` — 14 tests en Windows. El cliente
+  HTTP real (`OpenAICoachClient`, con timeout/retry) vive en
+  `RunCoach-iOS`, mismo patrón que `HeartRateMeasurementParser`/
+  `BLEHeartRateSource` en Fase 6. Ver [docs/openai.md](openai.md) para el
+  detalle completo del diseño y cómo se cumple cada requisito no
+  negociable (timeout, fallback, retry prudente, control de costo).
+
 **Pendiente (fases futuras):**
 
 - **Detección de eventos** más allá de la tendencia de FC: desviación de
@@ -210,6 +222,20 @@ integración) solo se valida por CI (compila para simulador) — nunca se vio
 corriendo, ni se escuchó sonar. `RunCoachCore`, en cambio, sí está
 verificado de verdad: ver PROJECT_STATUS.md para el resultado del build de
 CI y el detalle de tests.
+
+**Implementado (Fase 11 — OpenAI):**
+
+`OpenAIAPIKeyStore` (`App/OpenAI/`, Keychain) y `OpenAICoachClient`
+(`URLSession`, timeout de 5s, un reintento prudente). Cuando
+`CoachDecisionEngine` decide `.speak(event)`, `RunSessionViewModel` intenta
+`OpenAICoachClient` en un `Task` aparte (nunca bloquea `refresh()`); si
+responde a tiempo, dice esa recomendación, si no, cae a la frase fija de
+Fase 9-10. `SettingsView` tiene un campo real (no placeholder) para pegar
+la API key, guardada solo en el Keychain de ese iPhone.
+
+Ver [docs/openai.md](openai.md) para el diseño completo. Sin validar
+contra la API real — no hay API key creada para este proyecto todavía (eso
+requiere autorización explícita de Vicente, nunca autónomo).
 
 ## HeartRateSource: independencia de marca
 

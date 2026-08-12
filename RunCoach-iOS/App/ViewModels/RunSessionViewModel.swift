@@ -35,10 +35,15 @@ enum RunMode: Equatable {
 /// **Coach Decision Engine (Fase 10)**: además de los anuncios mecánicos,
 /// en cada `refresh()` se consulta a `CoachDecisionEngine` (RunCoachCore)
 /// — la pieza que sí decide cuándo vale la pena intervenir (cooldown,
-/// deduplicación, contexto reciente). Cuando decide `.speak(event)`, acá
-/// se traduce ese `CoachEvent` a una frase en español y se la pasa a
-/// `AudioCoach`. La traducción a texto vive acá (capa de presentación),
-/// no en `RunCoachCore`, igual que el resto del formateo de esta clase.
+/// deduplicación, contexto reciente).
+///
+/// **OpenAI (Fase 11)**: cuando el motor decide `.speak(event)`, primero
+/// se intenta `OpenAICoachClient` (async, con timeout y un reintento
+/// prudente — nunca bloquea `refresh()`). Si responde a tiempo, se dice
+/// esa recomendación; si no (sin API key, sin red, timeout, error), se
+/// cae de vuelta a la frase fija en español de siempre. La traducción a
+/// texto del fallback vive acá (capa de presentación), no en
+/// `RunCoachCore`.
 final class RunSessionViewModel: ObservableObject {
     @Published private(set) var isRunning = false
     @Published private(set) var mode: RunMode?
@@ -59,6 +64,7 @@ final class RunSessionViewModel: ObservableObject {
     private var coachDecisionEngine = CoachDecisionEngine()
     private var pendingWorkItems: [DispatchWorkItem] = []
     private let audioCoach = AudioCoach()
+    private let openAIClient = OpenAICoachClient()
 
     // Modo real
     private var heartRateSource: BLEHeartRateSource?
@@ -199,7 +205,25 @@ final class RunSessionViewModel: ObservableObject {
         }
 
         if case .speak(let event) = coachDecisionEngine.evaluate(runState: runState) {
-            audioCoach.speak(spokenText(for: event))
+            handleSpeakDecision(for: event)
+        }
+    }
+
+    /// Intenta una recomendación de OpenAI para `event` sin bloquear
+    /// `refresh()` — corre en un `Task` aparte. `summary` se captura por
+    /// valor en el instante de la decisión, así que no importa cuánto
+    /// tarde la red: no lee el `RunState` (que sigue mutando) después.
+    private func handleSpeakDecision(for event: CoachEvent) {
+        let fallbackText = spokenText(for: event)
+        let summary = CoachEventSummary.make(event: event, runState: runState)
+
+        Task { [weak self] in
+            guard let self else { return }
+            if let recommendation = await self.openAIClient.recommendation(for: summary) {
+                self.audioCoach.speak(recommendation.message)
+            } else {
+                self.audioCoach.speak(fallbackText)
+            }
         }
     }
 

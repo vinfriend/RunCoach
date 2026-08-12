@@ -6,37 +6,28 @@
 
 ## Fase actual
 
-**Fases 0 a 9** — **completadas**. Resumen rápido:
+**Fases 0 a 10** — **completadas**. Resumen rápido:
 
 - **0-1**: entorno Windows listo, arquitectura e investigación.
 - **2-3**: `RunCoachCore` (modelos, métricas, `RunState`, Simulation
-  Engine) — 40 tests en verde en Windows.
-- **4-5**: proyecto iOS + CI en Codemagic, UI SwiftUI con pantalla de
-  carrera simulada.
-- **6-7**: `BLEHeartRateSource` (CoreBluetooth) y `GPSLocationSource`
-  (CoreLocation) — validados solo por compilación en CI, sin hardware
-  real todavía. `HeartRateMeasurementParser` (parsing GATT) sí testeado
-  en Windows.
-- **8**: `RunSessionViewModel` soporta modo real (BLE+GPS con `Date` de
-  referencia compartido) además del simulado; `RunView` deja elegir.
-- **9**: `AudioCoach` (voz `es-AR`) anuncia eventos mecánicos —
-  inicio/fin de carrera, cada split. Sin lógica de decisión todavía.
+  Engine) — 40 tests.
+- **4-5**: proyecto iOS + CI en Codemagic, UI SwiftUI con carrera simulada.
+- **6-7**: `BLEHeartRateSource`/`GPSLocationSource` — solo compilación en
+  CI. `HeartRateMeasurementParser` testeado en Windows (8 tests).
+- **8**: modo real (BLE+GPS con `Date` de referencia compartido) conectado
+  a la UI.
+- **9**: `AudioCoach` (voz `es-AR`) anuncia eventos mecánicos.
+- **10**: `CoachDecisionEngine` — la pieza central, decide cuándo hablar
+  (11 tests, incluyendo un bug real corregido — ver docs/decisions.md).
 
-**Fase 10** (Coach Decision Engine) — **completada**. Build de Codemagic
-para el commit `9b61391` terminó `finished` sin pasos fallidos (1m 26s).
-La pieza central del proyecto, y la primera de las últimas cinco en vivir
-enteramente en `RunCoachCore` — **totalmente testeable en Windows**: 59
-tests en verde (11 nuevos). `CoachDecisionEngine` decide
-`.silence`/`.speak(event)` combinando deduplicación, cooldown, y contexto
-reciente. Validado contra el escenario completo de 20 minutos: pocas
-intervenciones, no una por muestra. Ya wireado a `AudioCoach` en
-`RunSessionViewModel`.
-
-**Bug real encontrado y corregido durante esta fase** (ver "Decisiones
-tomadas" #17): la deduplicación comparaba eventos por igualdad estricta
-(incluyendo el BPM exacto, que cambia en cada muestra), así que hablaba
-10 veces en vez de 2-3. El test de escenario completo lo atrapó
-inmediatamente.
+**Fase 11** (OpenAI) — **implementada, pendiente de confirmar build de CI
+de RunCoach-iOS**. Mismo patrón que Fase 6 (BLE): la lógica de
+armado/parseo de requests vive en `RunCoachCore` (**73 tests en total, 14
+nuevos**), el cliente HTTP real (`URLSession`, timeout, retry) vive en
+`RunCoach-iOS`. Cuando `CoachDecisionEngine` decide `.speak`, se intenta
+OpenAI de forma async (nunca bloquea); si no responde a tiempo o falla,
+cae a la frase fija de Fase 9-10. Sin API key configurada todavía — eso
+es una acción de Vicente (ver "Próxima tarea").
 
 Nota de proceso (desde Fase 5): el trigger automático por `push` de
 Codemagic no dispara solo — hay que iniciar el build a mano desde el
@@ -48,7 +39,8 @@ Ver `git log --oneline -1` para el hash exacto.
 
 ## Bloqueos
 
-Ninguno activo.
+Ninguno activo (la falta de API key de OpenAI no bloquea el desarrollo —
+la app funciona igual sin ella, solo sin recomendaciones enriquecidas).
 
 ## Entorno Windows
 
@@ -68,49 +60,56 @@ Detalle completo en [docs/windows-development.md](docs/windows-development.md).
 
 ## Tests en Windows
 
-**59 tests, 0 fallas**, en `RunCoachCore`:
+**73 tests, 0 fallas**, en `RunCoachCore`:
 
 - Fases 2-3 (40): modelos, métricas, `RunState`, Simulation Engine.
 - Fase 6 (8): `HeartRateMeasurementParser` — parsing GATT del Heart Rate
   Service.
-- Fase 10 (11): `CoachEventDetectorTests` (4), `CoachDecisionEngineTests`
-  (6), y el test de escenario completo de 20 minutos (1) que atrapó el
-  bug de deduplicación — ver docs/decisions.md.
+- Fase 10 (11): `CoachEventDetector`, `CoachDecisionEngine`, escenario
+  completo de 20 minutos.
+- Fase 11 (14): `OpenAICoachRequestBuilderTests` (7) — forma del JSON,
+  contenido del prompt según el evento; `OpenAICoachResponseParserTests`
+  (7) — respuestas válidas, malformadas, vacías.
 
 ## Build iOS
 
-**Fases 4 a 10 validadas en CI real** (todos los builds verdes).
+**Fases 4 a 10 validadas en CI real** (builds verdes). **Fase 11:
+pendiente de confirmar** — ver "Próxima tarea".
 
-### Qué se agregó en Fase 10
+### Qué se agregó en Fase 11
 
 **En `RunCoachCore` (testeado en Windows):**
 
-- `CoachEvent` (`Coach/`): `effortRising`/`effortFalling`, con un `.kind`
-  para deduplicar sin comparar el BPM exacto.
-- `CoachEventDetector`: función pura, sin memoria, que clasifica el
-  `RunState` actual en un evento candidato (o `nil`).
-- `CoachDecisionEngine`: decide `.silence`/`.speak(event)` combinando
-  deduplicación por tipo de evento, cooldown temporal (90s por defecto),
-  y contexto reciente (`recentSpokenEvents`, historial acotado). Un
-  evento bloqueado por cooldown se reintenta después, no se pierde.
+- `CoachEventSummary`: snapshot estructurado del `RunState` en el
+  instante de la decisión (no las muestras crudas).
+- `OpenAIChatMessage`/`OpenAIChatRequest`/`OpenAIChatResponse`: tipos
+  `Codable` que reflejan el formato de OpenAI Chat Completions.
+- `OpenAICoachRequestBuilder`: arma el prompt (system + user) — modelo
+  `gpt-4o-mini`, `max_tokens: 60` (control de costo deliberado).
+- `OpenAICoachResponseParser`: decodifica la respuesta en un
+  `CoachRecommendation`, `nil` ante cualquier forma inesperada.
 
-**En `RunCoach-iOS` (solo compilado, no verificado funcionalmente):**
+**En `RunCoach-iOS` (solo compilado, no verificado — sin API key ni Mac):**
 
-- `RunSessionViewModel`: consulta `CoachDecisionEngine` en cada
-  `refresh()`; cuando decide `.speak`, traduce el evento a español y se
-  lo pasa a `AudioCoach`. Se resetea un `CoachDecisionEngine` nuevo en
-  cada `start*()`, igual que `RunState`.
+- `OpenAIAPIKeyStore`: Keychain, `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`.
+- `OpenAICoachClient`: `URLSession` con timeout de 5s y **un** reintento
+  prudente (solo ante fallas transitorias: timeout, sin conexión, 429,
+  5xx — nunca ante 401 o JSON inesperado). Nunca lanza: cualquier falla
+  colapsa a `nil`.
+- `RunSessionViewModel`: al decidir `.speak(event)`, lanza un `Task`
+  aparte que intenta OpenAI y cae a la frase fija si no hay respuesta a
+  tiempo.
+- `SettingsView`: campo real (ya no placeholder) para pegar la API key.
 
-### Qué NO se hizo en Fase 10 (a propósito)
+### Qué NO se hizo en Fase 11 (a propósito)
 
-- **Arbitraje de prioridades entre eventos que compitan entre sí** — hoy
-  solo hay un detector (tendencia de FC), así que nunca hay dos
-  candidatos simultáneos que priorizar de verdad. Se vuelve relevante con
-  más detectores o con las recomendaciones de OpenAI (Fase 11).
-- Nada de OpenAI todavía — Fase 11.
-- Ningún detector nuevo más allá de tendencia de FC (pace deviation,
-  anomalías) — no estaba pedido para esta fase, y sin datos reales es
-  difícil calibrar umbrales con confianza.
+- Nada de voz conversacional ni Realtime API — sigue siendo texto → TTS
+  local, tal como pedía el prompt original.
+- Sin control de cuota/presupuesto explícito más allá de lo que ya acota
+  `CoachDecisionEngine` — no hace falta más para un proyecto personal en
+  esta etapa.
+- Sin telemetría de latencia/costo real — no se puede medir sin una API
+  key real y sin correr la app de verdad.
 
 ## Decisiones tomadas
 
@@ -140,19 +139,25 @@ Ver [docs/decisions.md](docs/decisions.md) para el detalle y motivos:
     inyectable (no auto-asignado), compartido entre ambas fuentes.
 16. `AudioCoach` es infraestructura pura, sin lógica de decisión.
 17. `CoachEventDetector` es sin memoria a propósito — toda la lógica
-    temporal vive en `CoachDecisionEngine`, para que un evento bloqueado
-    por cooldown se pueda reintentar en vez de perderse.
+    temporal vive en `CoachDecisionEngine`.
 18. Deduplicar por `CoachEvent.kind`, no por igualdad estricta — bug real
-    encontrado por el test de escenario completo (hablaba 10 veces en vez
-    de 2-3 porque el BPM asociado cambiaba en cada muestra).
+    encontrado por el test de escenario completo.
+19. Armado/parseo de requests de OpenAI vive en `RunCoachCore` (portable,
+    testeable); el cliente HTTP real vive en `RunCoach-iOS` — mismo
+    patrón que Fase 6.
+20. `OpenAICoachClient` reintenta una sola vez, solo ante fallas
+    transitorias (no ante 401 ni JSON inesperado).
+21. "Sin recomendación" (`nil`) es un resultado válido de
+    `OpenAICoachClient`, nunca un error que se propague — simplifica el
+    llamador y refuerza que la red nunca bloquea nada.
 
 ## Arquitectura
 
-Resumen en [docs/architecture.md](docs/architecture.md). Con Fase 10, la
-pieza que le da sentido a todo el proyecto —"cuándo vale la pena que el
-coach hable"— ya existe y está testeada de verdad. Falta conectarla con
-OpenAI (Fase 11) para que lo que dice sea más rico que frases fijas en
-español.
+Resumen en [docs/architecture.md](docs/architecture.md). Con Fase 11, el
+flujo completo previsto desde el prompt original ya existe en código:
+datos → RunState → Coach Decision Engine → resumen estructurado → OpenAI
+→ recomendación → voz. Falta la firma/distribución (Fases 12-13) para
+poder probarlo de verdad en un iPhone.
 
 ## Hardware
 
@@ -162,22 +167,25 @@ Sin compras realizadas.
 ## Riesgos identificados
 
 Ver tabla completa en [docs/architecture.md](docs/architecture.md#riesgos-identificados-fase-1).
-Sin cambios nuevos — la parte de `RunCoach-iOS` de Fase 10 hereda el mismo
-riesgo de "código nunca antes escuchado" de Fases 6-9. La parte de
-`RunCoachCore`, en cambio, es la más sólidamente verificada del proyecto
-hasta ahora.
+`OpenAICoachClient` hereda el mismo riesgo de "código nunca antes
+ejecutado" que BLE/GPS/Audio — agravado porque ni siquiera hay una API
+key para probarlo cuando llegue el momento de tener un iPhone. La parte de
+`RunCoachCore` (request/response), en cambio, está sólidamente testeada.
 
-## Archivos creados/modificados (Fase 10)
+## Archivos creados/modificados (Fase 11)
 
 ```
-RunCoachCore/Sources/RunCoachCore/Coach/CoachEvent.swift            (nuevo)
-RunCoachCore/Sources/RunCoachCore/Coach/CoachEventDetector.swift    (nuevo)
-RunCoachCore/Sources/RunCoachCore/Coach/CoachDecision.swift         (nuevo)
-RunCoachCore/Sources/RunCoachCore/Coach/CoachDecisionEngine.swift   (nuevo)
-RunCoachCore/Tests/RunCoachCoreTests/CoachEventDetectorTests.swift  (nuevo)
-RunCoachCore/Tests/RunCoachCoreTests/CoachDecisionEngineTests.swift (nuevo)
-RunCoachCore/Tests/RunCoachCoreTests/ReferenceScenarioTests.swift   (modificado)
-RunCoach-iOS/App/ViewModels/RunSessionViewModel.swift               (modificado)
+RunCoachCore/Sources/RunCoachCore/OpenAI/CoachEventSummary.swift            (nuevo)
+RunCoachCore/Sources/RunCoachCore/OpenAI/OpenAIChatModels.swift             (nuevo)
+RunCoachCore/Sources/RunCoachCore/OpenAI/OpenAICoachRequestBuilder.swift    (nuevo)
+RunCoachCore/Sources/RunCoachCore/OpenAI/OpenAICoachResponseParser.swift    (nuevo)
+RunCoachCore/Sources/RunCoachCore/OpenAI/CoachRecommendation.swift          (nuevo)
+RunCoachCore/Tests/RunCoachCoreTests/OpenAICoachRequestBuilderTests.swift   (nuevo)
+RunCoachCore/Tests/RunCoachCoreTests/OpenAICoachResponseParserTests.swift   (nuevo)
+RunCoach-iOS/App/OpenAI/OpenAIAPIKeyStore.swift                             (nuevo)
+RunCoach-iOS/App/OpenAI/OpenAICoachClient.swift                             (nuevo)
+RunCoach-iOS/App/ViewModels/RunSessionViewModel.swift                       (modificado)
+RunCoach-iOS/App/Views/SettingsView.swift                                   (modificado)
 ```
 
 ## Git
@@ -187,6 +195,13 @@ Repo en GitHub: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/Run
 
 ## Próxima tarea
 
-Esperar "Continuar con Fase 11" (OpenAI) de Vicente — la primera fase que
-va a requerir que Vicente cree una cuenta/API key de OpenAI (con
-autorización explícita, nunca guardada en Git).
+Confirmar con Vicente el build de Codemagic para el commit de Fase 11
+(hay que iniciarlo a mano). Si pasa, Fase 11 queda completa en el sentido
+de "compila".
+
+Después, esperar "Continuar con Fase 12" (Apple Developer / firma) de
+Vicente. **Esa fase va a necesitar una acción de Vicente distinta a las
+anteriores**: crear/pagar una cuenta de Apple Developer Program — algo
+que nunca se hace de forma autónoma. También sería el momento natural
+para que Vicente cree la API key de OpenAI si quiere probarla (opcional,
+no bloquea nada).
