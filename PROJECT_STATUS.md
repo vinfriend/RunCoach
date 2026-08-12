@@ -29,10 +29,10 @@ bloqueadas también. Ver [docs/ios-build.md](docs/ios-build.md#fase-12--apple-de
 para el plan completo, listo para retomar cuando Vicente decida.
 
 **Fase 19** (Historial y análisis post-carrera) — **adelantada y
-completada** (en el sentido de "compila"; la parte de `RunCoachCore` está
-testeada de verdad). No depende de firma ni de hardware, así que se
-adelantó salteando 12-18 por instrucción explícita de Vicente
-("continuá todo lo que sea posible sin la membresía"). Ver
+completada**. Build de Codemagic para el commit `f4e6457` terminó
+`finished` sin pasos fallidos (1m 18s). No depende de firma ni de
+hardware, así que se adelantó salteando 12-18 por instrucción explícita
+de Vicente ("continuá todo lo que sea posible sin la membresía"). Ver
 docs/decisions.md para el razonamiento completo de por qué el roadmap deja
 de ser estrictamente secuencial acá.
 
@@ -93,8 +93,8 @@ Detalle completo en [docs/windows-development.md](docs/windows-development.md).
 
 ## Build iOS
 
-**Fases 4 a 11 validadas en CI real** (todos los builds verdes). **Fase
-19: pendiente de confirmar** — ver "Próxima tarea".
+**Fases 4 a 11 y Fase 19 validadas en CI real** (todos los builds
+verdes).
 
 ### Qué se agregó en Fase 19
 
@@ -220,11 +220,8 @@ Repo en GitHub: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/Run
 
 ## Próxima tarea
 
-Confirmar con Vicente el build de Codemagic para el commit de Fase 19
-(hay que iniciarlo a mano). Si pasa, Fase 19 queda completa.
-
-Después: no hay más fases avanzables sin firma/hardware según el roadmap
-original. Opciones para cuando Vicente quiera seguir:
+No hay más fases avanzables sin firma/hardware según el roadmap original.
+Opciones para cuando Vicente quiera seguir:
 
 1. Retomar Fase 12 (pagar Apple Developer) cuando decida.
 2. Pedir trabajo adicional dentro de lo ya alcanzable sin cuenta/hardware
