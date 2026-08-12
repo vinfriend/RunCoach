@@ -10,21 +10,19 @@
 **Fase 1** (arquitectura/investigación) — **completada**.
 **Fase 2** (RunCoachCore: modelos, métricas, `RunState`) — **completada**.
 **Fase 3** (Simulation Engine) — **completada**.
-**Fase 4** (Proyecto iOS + CI macOS) — **completada**. Primer build real
-en Codemagic (`runcoach-ios-unsigned-build`, commit `dfa3980`) terminó en
-verde: `Status: finished`, todos los pasos OK, sin ningún paso en rojo
-(build de 1m 12s). El proyecto compila en CI sin depender de una Mac
-local — objetivo central de esta fase, cumplido.
+**Fase 4** (Proyecto iOS + CI macOS) — **completada**.
+**Fase 5** (UI SwiftUI) — **implementada, pendiente de confirmar en CI**
+(ver "Build iOS" abajo — el commit que la sube dispara un build nuevo en
+Codemagic, pero **no se puede verificar visualmente sin Mac/iPhone**; el CI
+solo confirma que compila, no que la UI se vea o funcione bien).
 
 ## Último commit estable
 
-Ver `git log --oneline -1` para el hash exacto. Incluye Fase 0 a Fase 4
-completas.
+Ver `git log --oneline -1` para el hash exacto.
 
 ## Bloqueos
 
-Ninguno activo. Los dos de Fase 4 (repo en GitHub, cuenta de Codemagic)
-quedaron resueltos por Vicente.
+Ninguno activo.
 
 ## Entorno Windows
 
@@ -37,7 +35,7 @@ quedaron resueltos por Vicente.
 | Visual Studio 2022 Build Tools + Windows 11 SDK (10.0.22621.0) | OK |
 | VS Code 1.118.0 | OK |
 | winget 1.29.280 | OK |
-| GitHub CLI (`gh`) | **Instalado** (Fase 4) — sin autenticar todavía (`gh auth login` pendiente, acción de Vicente) |
+| GitHub CLI (`gh`) | Instalado, sin autenticar (no hizo falta — push por HTTPS) |
 | Docker | No instalado — no requerido por ahora |
 
 Detalle completo en [docs/windows-development.md](docs/windows-development.md).
@@ -45,34 +43,51 @@ Detalle completo en [docs/windows-development.md](docs/windows-development.md).
 ## Tests en Windows
 
 Sin cambios respecto a Fase 3: **40 tests, 0 fallas**, en `RunCoachCore`.
-Fase 4 no agregó lógica a `RunCoachCore` — solo el proyecto iOS, que no se
-puede testear en Windows (ver [docs/windows-development.md](docs/windows-development.md)).
+Fase 4 y Fase 5 no agregaron lógica a `RunCoachCore` — todo lo nuevo vive
+en `RunCoach-iOS`, que no se puede testear en Windows (ver
+[docs/windows-development.md](docs/windows-development.md)).
 
 ## Build iOS
 
-**Validado en CI real (Codemagic).** Existe:
+**Fase 4 validada en CI real** (build verde, ver historial de commits).
+**Fase 5 recién escrita — su build de CI todavía no se confirmó** al
+momento de cerrar esta sesión de trabajo. Antes de asumir que Fase 5 está
+completa, hay que:
 
-- `RunCoach-iOS/project.yml` (XcodeGen): target `RunCoach`, dependencia
-  local a `RunCoachCore`, `deploymentTarget: 16.0`, permisos de ubicación/
-  Bluetooth/background modes declarados (placeholders para Fases 6-9).
-  `info.path: App/Info.plist` — XcodeGen genera el Info.plist ahí (ver bug
-  corregido abajo).
-- `RunCoach-iOS/App/RunCoachApp.swift` + `ContentView.swift`: skeleton
-  mínimo de SwiftUI que instancia un `RunState()` de `RunCoachCore` — solo
-  para probar la integración del paquete, no es la UI real (Fase 5).
-- `RunCoach-iOS/Resources/Assets.xcassets/`: catálogo de assets mínimo con
-  un slot de `AppIcon` vacío (sin imagen todavía).
-- `codemagic.yaml` (raíz del repo): workflow `runcoach-ios-unsigned-build`
-  — instala XcodeGen, genera el proyecto, compila para iOS Simulator sin
-  firma (`CODE_SIGNING_ALLOWED=NO`). Sin publishing (no hay Apple Developer
-  account, eso es Fase 12).
+1. Confirmar que el build de Codemagic para el commit de Fase 5 terminó en
+   verde (mismo procedimiento que en Fase 4: mirar el dashboard).
+2. Tener en cuenta que un build verde en Codemagic **solo confirma que
+   compila** — no que la UI se vea bien, que la navegación funcione, o que
+   el timing de la simulación sea razonable. Eso requiere correrlo en un
+   simulador o iPhone real, que todavía no tenemos (Fases 12-13).
 
-**Bug real encontrado y corregido en el primer intento**: el build #1
-falló en `xcodegen generate` con `Decoding failed at "path": Nothing
-found` — `info.properties` sin `info.path` no es válido para XcodeGen (el
-`path` del Plist es obligatorio aunque el archivo no exista todavía). Fix
-de una línea (commit `dfa3980`), build #2 pasó limpio. Detalle en
-[docs/decisions.md](docs/decisions.md).
+### Qué se agregó en Fase 5
+
+- `RunCoach-iOS/App/ViewModels/RunSessionViewModel.swift`: `ObservableObject`
+  que envuelve `RunState` + `ScenarioSimulator` de `RunCoachCore` (Fase 3)
+  con pacing en tiempo real acelerado (20x por defecto, usando
+  `DispatchQueue.main.asyncAfter`) — el escenario de 20 minutos se ve en
+  ~1 minuto. Este pacing vive acá (no en `RunCoachCore`) porque usa
+  `DispatchQueue`, que no existe en Windows/Linux.
+- `RunCoach-iOS/App/Views/RunView.swift`: pantalla de carrera. Estado
+  inicial con botón "Iniciar carrera (simulación)" y aviso explícito de
+  que no hay sensores reales todavía; estado corriendo con tiempo
+  transcurrido, distancia, ritmo, FC + ícono de tendencia, y lista de
+  splits a medida que se completan.
+- `RunCoach-iOS/App/Views/HistoryView.swift` y `SettingsView.swift`:
+  placeholders honestos, cada uno indicando en qué fase futura se
+  implementa de verdad (Fase 19 y Fase 6/11 respectivamente).
+- `RunCoach-iOS/App/ContentView.swift`: reemplaza el placeholder de Fase 4
+  por un `TabView` real (Correr / Historial / Ajustes).
+
+### Qué NO se hizo en Fase 5 (a propósito)
+
+- Nada de BLE (Fase 6) ni GPS real (Fase 7) — la pantalla de carrera solo
+  consume el escenario simulado.
+- Nada de audio/voz (Fase 9) ni Coach Decision Engine (Fase 10) — no hay
+  ninguna recomendación hablada todavía, solo métricas numéricas en
+  pantalla.
+- Nada de persistencia — el historial es un placeholder vacío.
 
 ## Decisiones tomadas
 
@@ -89,16 +104,20 @@ Ver [docs/decisions.md](docs/decisions.md) para el detalle y motivos:
 7. Timestamps como `TimeInterval` relativo, no `Date`.
 8. Simulation Engine con reproducción síncrona e inmediata en los Mock
    sources.
-9. Bundle ID `com.vicente.runcoach` como placeholder hasta que exista una
-   cuenta de Apple Developer real (Fase 12).
-10. Primer build de CI sin firma (solo simulador) — no hay certificados
-    todavía, y no hacen falta para validar que el proyecto compila.
+9. Bundle ID `com.vicente.runcoach` como placeholder hasta Fase 12.
+10. Primer build de CI sin firma (solo simulador).
+11. `info.path` es obligatorio en el bloque `info:` de XcodeGen (bug real
+    encontrado y corregido en el primer build de Fase 4).
+12. Pacing en tiempo real de la simulación vive en `RunCoach-iOS`
+    (`RunSessionViewModel`), no en `RunCoachCore` — usa `DispatchQueue`,
+    rompería la portabilidad a Windows si estuviera en el core.
 
 ## Arquitectura
 
-Resumen en [docs/architecture.md](docs/architecture.md). Sin cambios de
-fondo en Fase 4 — se agregó el proyecto iOS concreto sobre el diseño ya
-documentado (RunCoachCore portable + RunCoach-iOS específico de Apple).
+Resumen en [docs/architecture.md](docs/architecture.md). Fase 5 no cambió
+el diseño de fondo — agregó la capa de presentación (SwiftUI) sobre
+`RunCoachCore`, consumiendo el Simulation Engine de Fase 3 tal como estaba
+previsto ("el mismo motor consume fuentes simuladas y reales").
 
 ## Hardware
 
@@ -108,33 +127,32 @@ Sin compras realizadas.
 ## Riesgos identificados
 
 Ver tabla completa en [docs/architecture.md](docs/architecture.md#riesgos-identificados-fase-1).
-Confirmado en Fase 4: `project.yml`/`codemagic.yaml` sí necesitaron una
-iteración de fix una vez corridos en CI de verdad (esperable, sin Mac local
-para probarlos antes) — mitigado, no bloqueante.
+Nuevo en Fase 5: el código de `RunCoach-iOS` (SwiftUI) nunca se compiló ni
+se vio corriendo antes de este commit — ni siquiera hay certeza de que el
+build de CI ya haya corrido. Es el mismo riesgo estructural de no tener Mac
+local, ahora aplicado a código de UI en vez de solo configuración.
 
-## Archivos creados (nuevos en Fase 4)
+## Archivos creados (nuevos en Fase 5)
 
 ```
-codemagic.yaml
-RunCoach-iOS/project.yml
-RunCoach-iOS/App/RunCoachApp.swift
-RunCoach-iOS/App/ContentView.swift
-RunCoach-iOS/Resources/Assets.xcassets/Contents.json
-RunCoach-iOS/Resources/Assets.xcassets/AppIcon.appiconset/Contents.json
+RunCoach-iOS/App/ViewModels/RunSessionViewModel.swift
+RunCoach-iOS/App/Views/RunView.swift
+RunCoach-iOS/App/Views/HistoryView.swift
+RunCoach-iOS/App/Views/SettingsView.swift
 ```
 
-(Lista completa de archivos de fases anteriores sin cambios — ver el
-historial de este documento en `git log -p PROJECT_STATUS.md` si hace
-falta.)
+(`RunCoach-iOS/App/ContentView.swift` se modificó, no es nuevo.)
 
 ## Git
 
-Repo local con commits de Fase 0/1, Fase 2, Fase 3 y Fase 4, **pusheado a
-GitHub**: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/RunCoach)
-(`main`, en sync con `origin/main`). Codemagic conectado y con build verde.
+Repo en GitHub: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/RunCoach),
+`main` en sync con `origin/main`. Codemagic conectado.
 
 ## Próxima tarea
 
-Esperar confirmación explícita de Vicente ("Continuar con Fase 5") antes de
-empezar la UI real de SwiftUI (pantalla de carrera, configuración,
-historial) sobre el skeleton actual.
+**Antes de seguir**: confirmar el resultado del build de Codemagic para el
+commit de Fase 5 (pedirle a Vicente que lo revise, igual que en Fase 4). Si
+falla, corregir. Si pasa, Fase 5 queda completa — pero con la salvedad de
+que sigue sin haberse *visto* funcionando en un dispositivo/simulador real,
+solo compilada. Recién con eso resuelto espero el "Continuar con Fase 6"
+(BLE) de Vicente.

@@ -105,6 +105,20 @@ Todo lo específico de Apple:
   plano ni en Git).
 - Ciclo de vida iOS, permisos, manejo de interrupciones de audio/llamadas.
 
+**Implementado (Fase 5):**
+
+- `ContentView` (`TabView`): Correr / Historial / Ajustes.
+- `RunView` + `RunSessionViewModel`: pantalla de carrera funcional,
+  alimentada por el Simulation Engine de `RunCoachCore` (Fase 3) con
+  pacing en tiempo real acelerado — ver [docs/decisions.md](decisions.md).
+  Todavía sin BLE/GPS reales (Fases 6-7).
+- `HistoryView`/`SettingsView`: placeholders que señalan explícitamente
+  qué fase futura los implementa de verdad.
+
+Como no hay Mac local, este código solo se valida por CI (compila para
+simulador) — nunca se vio corriendo. Ver PROJECT_STATUS.md para el
+resultado real del build.
+
 ## HeartRateSource: independencia de marca
 
 ```swift

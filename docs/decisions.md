@@ -183,3 +183,31 @@ archivo ahí a partir de `properties` en el próximo `xcodegen generate`.
 en CI, no antes — al iterar sobre esto, esperar 1-2 vueltas más de este
 mismo patrón (fallo en CI → leer log → fix → commit → nuevo build) es
 normal, no señal de que el diseño esté mal.
+
+---
+
+## 2026-08-11 — Fase 5: pacing en tiempo real vive en RunCoach-iOS, no en RunCoachCore
+
+**Decisión**: `RunSessionViewModel` (en `RunCoach-iOS/App/ViewModels/`)
+reproduce el escenario simulado con `DispatchQueue.main.asyncAfter`,
+acelerado 20x por defecto, envolviendo `RunState` +
+`ScenarioSimulator.generate*Samples` de `RunCoachCore` sin modificarlos.
+
+**Motivo**: `MockHeartRateSource`/`MockLocationSource` (Fase 3) reproducen
+todas las muestras de forma síncrona e inmediata a propósito — es lo que
+necesitan los tests deterministas. Para que la pantalla de carrera tenga
+sentido visualmente (ver los números cambiar en el tiempo), hace falta
+pacing real, pero eso usa `DispatchQueue`, que no existe en Windows/Linux.
+Meterlo en `RunCoachCore` hubiera roto la portabilidad a Windows sin
+necesidad — el pacing es una preocupación de la capa de presentación, no
+del motor de dominio.
+
+**Impacto**: cuando lleguen las fuentes reales (BLE Fase 6, GPS Fase 7),
+`RunSessionViewModel` se puede adaptar para consumirlas en vez del
+escenario simulado, sin tocar `RunCoachCore` — es exactamente el punto de
+la abstracción `HeartRateSource`/`LocationSource`.
+
+**Limitación conocida**: este código (como todo `RunCoach-iOS`) no se pudo
+compilar ni ejecutar localmente — no hay Mac. Se valida únicamente vía el
+build de Codemagic (compila para simulador, no corre la UI). Ver
+PROJECT_STATUS.md para el resultado real una vez que corra en CI.
