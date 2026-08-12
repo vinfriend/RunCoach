@@ -77,6 +77,23 @@ symlink en `.build\debug` (`encountered an I/O error (code: 512)`). No
 afecta el resultado del build ni de los tests — es una limitación de
 symlinks en esta carpeta (dentro de OneDrive). Se puede ignorar.
 
+### `git push` puede fallar transitoriamente por OneDrive
+
+Como el repo vive dentro de una carpeta sincronizada por OneDrive, a veces
+`git push` falla con algo como:
+
+```
+error: unable to open loose object <hash>: Permission denied
+fatal: object <hash> cannot be read
+```
+
+Es OneDrive reteniendo un lock momentáneo sobre un archivo interno de
+`.git/objects` mientras lo sincroniza — no es corrupción del repo. Alcanza
+con reintentar `git push` (funcionó a la primera en la única vez que pasó,
+en Fase 10). Si se repite seguido, correr `git fsck --full` para confirmar
+que no hay daño real (los `dangling blob`/`dangling commit` que puede
+listar son normales, no son un problema).
+
 ## Editor
 
 VS Code ya está instalado. Para autocompletado/soporte de Swift se puede
