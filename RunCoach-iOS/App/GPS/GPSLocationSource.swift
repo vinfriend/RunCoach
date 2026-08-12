@@ -15,12 +15,15 @@ import RunCoachCore
 final class GPSLocationSource: NSObject, LocationSource {
     var onSample: ((LocationSample) -> Void)?
 
-    private let locationManager = CLLocationManager()
-
     /// Igual que en `BLEHeartRateSource`: instante de referencia contra
     /// el que se calculan los timestamps relativos de cada
-    /// `LocationSample`, fijado en `start()`.
-    private var referenceStartDate: Date?
+    /// `LocationSample`. Quien coordine varias fuentes (Fase 8,
+    /// `RunSessionViewModel`) debe fijar el mismo `Date` acá y en
+    /// `BLEHeartRateSource.referenceStartDate` antes de llamar `start()`.
+    var referenceStartDate = Date()
+
+    private let locationManager = CLLocationManager()
+    private var isRunning = false
 
     override init() {
         super.init()
@@ -33,7 +36,7 @@ final class GPSLocationSource: NSObject, LocationSource {
     }
 
     func start() {
-        referenceStartDate = Date()
+        isRunning = true
 
         switch locationManager.authorizationStatus {
         case .notDetermined:
@@ -48,7 +51,7 @@ final class GPSLocationSource: NSObject, LocationSource {
     }
 
     func stop() {
-        referenceStartDate = nil
+        isRunning = false
         locationManager.stopUpdatingLocation()
     }
 
@@ -66,7 +69,7 @@ final class GPSLocationSource: NSObject, LocationSource {
 
 extension GPSLocationSource: CLLocationManagerDelegate {
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        guard referenceStartDate != nil else { return }
+        guard isRunning else { return }
         switch manager.authorizationStatus {
         case .authorizedWhenInUse, .authorizedAlways:
             beginUpdating()
@@ -76,7 +79,7 @@ extension GPSLocationSource: CLLocationManagerDelegate {
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let referenceStartDate else { return }
+        guard isRunning else { return }
         for location in locations {
             let sample = LocationSample(
                 latitude: location.coordinate.latitude,

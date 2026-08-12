@@ -1,10 +1,16 @@
 import SwiftUI
 import RunCoachCore
 
-/// Pantalla principal de carrera. Sin sensores reales todavía (Fases 6-7):
-/// el botón "Iniciar" corre el escenario de referencia simulado de
-/// RunCoachCore (Fase 3) a velocidad acelerada, para poder probar la UI y
-/// el motor de métricas de punta a punta sin hardware.
+/// Pantalla principal de carrera. Dos modos (Fase 8):
+///
+/// - **Simulación**: corre el escenario de referencia de RunCoachCore
+///   (Fase 3) a velocidad acelerada. Validado end-to-end desde Fase 5.
+/// - **Real**: usa `BLEHeartRateSource` (Fase 6) y `GPSLocationSource`
+///   (Fase 7) de verdad. Sin sensor ni GPS conectados, este modo
+///   simplemente no va a mostrar datos — no hay forma de probarlo sin
+///   hardware real (Fase 14) ni de verlo funcionar en el simulador de iOS
+///   (sin radio Bluetooth ahí). Está acá porque el "motor" ya está
+///   completo (Fase 8), no porque ya se haya usado con éxito.
 struct RunView: View {
     @StateObject private var session = RunSessionViewModel()
 
@@ -21,30 +27,60 @@ struct RunView: View {
     }
 
     private var startView: some View {
+        ScrollView {
+            startViewContent
+        }
+    }
+
+    private var startViewContent: some View {
         VStack(spacing: 16) {
             Image(systemName: "figure.run.circle")
                 .font(.system(size: 64))
                 .foregroundStyle(.tint)
-            Text("Sin sensores reales todavía")
+
+            Text("Simulación")
                 .font(.headline)
             Text("""
-            Esta pantalla corre el escenario de referencia simulado de 20 \
-            minutos, acelerado, para poder probar la app sin hardware. La \
-            conexión a un sensor de FC real y al GPS llegan en fases \
-            siguientes.
+            Corre el escenario de referencia simulado de 20 minutos, \
+            acelerado, para probar la app sin hardware.
             """)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             Button("Iniciar carrera (simulación)") {
-                session.start()
+                session.startSimulated()
             }
             .buttonStyle(.borderedProminent)
+
+            Divider()
+                .padding(.vertical, 4)
+
+            Text("Sensores reales")
+                .font(.headline)
+            Text("""
+            Usa un sensor de FC por Bluetooth y el GPS del iPhone de \
+            verdad. Sin un sensor conectado no va a mostrar datos — \
+            todavía no se probó con hardware real.
+            """)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button("Iniciar carrera (sensores reales)") {
+                session.startReal()
+            }
+            .buttonStyle(.bordered)
         }
     }
 
     private var metricsView: some View {
         VStack(spacing: 20) {
+            if let mode = session.mode {
+                Text(mode == .simulated ? "Simulación" : "Sensores reales")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+            }
+
             Text(formattedElapsed)
                 .font(.system(size: 48, weight: .bold, design: .rounded))
                 .monospacedDigit()

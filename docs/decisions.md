@@ -288,3 +288,33 @@ fase es más verificable que la anterior — pero sin Mac para abrir Xcode,
 la diferencia práctica es nula por ahora. Documentado para que quede claro
 que la limitación actual es "no tenemos Mac", no "CoreLocation no se puede
 probar nunca sin hardware" (que sí sería el caso de BLE).
+
+---
+
+## 2026-08-11 — Fase 8: `referenceStartDate` inyectable en las fuentes reales
+
+**Decisión**: `BLEHeartRateSource.referenceStartDate` y
+`GPSLocationSource.referenceStartDate` pasan de fijarse solos con
+`Date()` dentro de `start()` a ser propiedades públicas settable, con
+`Date()` como valor por defecto (útil para uso standalone). Quien
+coordina una carrera real (`RunSessionViewModel.startReal()`, Fase 8) crea
+un único `Date()` y se lo asigna a **ambas** fuentes antes de arrancarlas.
+
+**Motivo**: esta era exactamente la nota pendiente dejada en la decisión
+de Fase 6 ("timestamp de BLEHeartRateSource... a revisar en Fase 8 si
+todas las fuentes deben compartir un único punto de referencia"). Sin
+esto, si `BLEHeartRateSource` y `GPSLocationSource` fijan cada una su
+propio `Date()` en momentos ligeramente distintos (por ejemplo,
+`GPSLocationSource` puede arrancar de inmediato pero `BLEHeartRateSource`
+espera a que `CBCentralManager` esté `poweredOn`), sus timestamps
+relativos quedarían desalineados entre sí — un problema real para
+`RunState`, que asume que los timestamps de FC y de GPS son comparables
+en la misma línea de tiempo.
+
+**Impacto**: `isRunning` (bool interno) reemplaza a "`referenceStartDate
+!= nil`" como flag de "¿estoy corriendo?" en ambas clases, ya que
+`referenceStartDate` ahora siempre tiene un valor (no es opcional).
+
+**Sin validar con hardware real** — como el resto de Fases 6-8, esto es
+una corrección de diseño razonada a partir de cómo funcionan las APIs
+documentadas, no confirmada empíricamente.

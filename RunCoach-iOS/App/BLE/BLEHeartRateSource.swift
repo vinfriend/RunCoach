@@ -23,18 +23,25 @@ import RunCoachCore
 final class BLEHeartRateSource: NSObject, HeartRateSource {
     var onSample: ((HeartRateSample) -> Void)?
 
+    /// Instante de referencia contra el que se calculan los timestamps
+    /// relativos de cada `HeartRateSample` (ver la nota sobre
+    /// `TimeInterval` relativo en `HeartRateSample`).
+    ///
+    /// Quien orqueste una carrera real con varias fuentes (Fase 8,
+    /// `RunSessionViewModel`) debe fijar el mismo `Date` acá y en
+    /// `GPSLocationSource.referenceStartDate` **antes** de llamar
+    /// `start()`, para que los timestamps de FC y de GPS sean
+    /// comparables entre sí. Si no se toca, por defecto es el instante en
+    /// que se crea esta instancia — razonable para uso standalone, pero
+    /// no para coordinarla con otra fuente.
+    var referenceStartDate = Date()
+
     private static let heartRateServiceUUID = CBUUID(string: "180D")
     private static let heartRateMeasurementCharacteristicUUID = CBUUID(string: "2A37")
 
     private var centralManager: CBCentralManager!
     private var heartRatePeripheral: CBPeripheral?
-
-    /// Instante de referencia contra el que se calculan los timestamps
-    /// relativos de cada `HeartRateSample` (ver la nota sobre
-    /// `TimeInterval` relativo en `HeartRateSample`). No-nil mientras la
-    /// fuente está "corriendo" — también se usa como flag interno para
-    /// decidir si hay que reintentar escanear tras una desconexión.
-    private var referenceStartDate: Date?
+    private var isRunning = false
 
     override init() {
         super.init()
@@ -42,7 +49,7 @@ final class BLEHeartRateSource: NSObject, HeartRateSource {
     }
 
     func start() {
-        referenceStartDate = Date()
+        isRunning = true
         if centralManager.state == .poweredOn {
             startScanning()
         }
@@ -51,7 +58,7 @@ final class BLEHeartRateSource: NSObject, HeartRateSource {
     }
 
     func stop() {
-        referenceStartDate = nil
+        isRunning = false
         centralManager.stopScan()
         if let heartRatePeripheral {
             centralManager.cancelPeripheralConnection(heartRatePeripheral)
@@ -68,7 +75,7 @@ final class BLEHeartRateSource: NSObject, HeartRateSource {
 
 extension BLEHeartRateSource: CBCentralManagerDelegate {
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
-        guard central.state == .poweredOn, referenceStartDate != nil else { return }
+        guard central.state == .poweredOn, isRunning else { return }
         startScanning()
     }
 
@@ -89,7 +96,7 @@ extension BLEHeartRateSource: CBCentralManagerDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
-        guard referenceStartDate != nil else { return }
+        guard isRunning else { return }
         heartRatePeripheral = nil
         startScanning()
     }
@@ -99,7 +106,7 @@ extension BLEHeartRateSource: CBCentralManagerDelegate {
         // Una estrategia más sofisticada (backoff, aviso al usuario) se
         // ajusta con datos reales en la Fase 14 — no hay forma de afinar
         // esto sin un sensor de verdad.
-        guard referenceStartDate != nil else { return }
+        guard isRunning else { return }
         heartRatePeripheral = nil
         startScanning()
     }
@@ -124,10 +131,10 @@ extension BLEHeartRateSource: CBPeripheralDelegate {
 
     func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         guard
+            isRunning,
             characteristic.uuid == Self.heartRateMeasurementCharacteristicUUID,
             let data = characteristic.value,
-            let bpm = HeartRateMeasurementParser.parseHeartRateBPM(from: [UInt8](data)),
-            let referenceStartDate
+            let bpm = HeartRateMeasurementParser.parseHeartRateBPM(from: [UInt8](data))
         else { return }
 
         let sample = HeartRateSample(bpm: bpm, timestamp: Date().timeIntervalSince(referenceStartDate))

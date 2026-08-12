@@ -128,8 +128,23 @@ Todo lo específico de Apple:
   Debug > Simulate Location) — pero sin Mac para abrir Xcode, sigue sin
   poder probarse de este lado, igual que BLE.
 
-Ninguno de los dos (`BLEHeartRateSource`, `GPSLocationSource`) está
-conectado a la UI todavía — eso es Fase 8 (Run Data Engine completo).
+**Implementado (Fase 8 — Run Data Engine completo):**
+
+`RunSessionViewModel` ahora soporta dos modos (`RunMode`):
+
+- `.simulated` — el de Fase 5, sin cambios de fondo.
+- `.real` — crea un `BLEHeartRateSource` y un `GPSLocationSource`, les fija
+  el **mismo** `Date` de referencia antes de llamar `start()` en cada uno
+  (resolviendo la nota pendiente de Fase 6 sobre timestamps comparables
+  entre fuentes — ver [docs/decisions.md](decisions.md)), y alimenta el
+  mismo `RunState` con lo que vayan entregando.
+
+`RunView` deja elegir el modo desde la pantalla inicial. El modo real
+sigue sin poder validarse funcionalmente — sin sensor ni GPS conectados no
+va a mostrar nada, y no hay forma de confirmar que funciona sin hardware
+real (Fase 14) ni de verlo correr en simulador (BLE no anda ahí). El
+"motor" está completo; que ande de verdad es otra historia, pendiente de
+Fase 14.
 
 Como no hay Mac local, todo este código solo se valida por CI (compila
 para simulador) — nunca se vio corriendo. Ver PROJECT_STATUS.md para el
