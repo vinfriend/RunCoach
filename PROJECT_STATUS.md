@@ -20,15 +20,20 @@
 - **10**: `CoachDecisionEngine` — la pieza central, decide cuándo hablar
   (11 tests, incluyendo un bug real corregido — ver docs/decisions.md).
 
-**Fase 11** (OpenAI) — **completada** (en el sentido de "compila"). Build
-de Codemagic para el commit `6dbdf57` terminó `finished` sin pasos
-fallidos (1m 6s). Mismo patrón que Fase 6 (BLE): la lógica de
-armado/parseo de requests vive en `RunCoachCore` (**73 tests en total, 14
-nuevos**), el cliente HTTP real (`URLSession`, timeout, retry) vive en
-`RunCoach-iOS`. Cuando `CoachDecisionEngine` decide `.speak`, se intenta
-OpenAI de forma async (nunca bloquea); si no responde a tiempo o falla,
-cae a la frase fija de Fase 9-10. Sin API key configurada todavía — eso
-es una acción de Vicente (ver "Próxima tarea").
+**Fase 11** (OpenAI) — **completada** (en el sentido de "compila"). Mismo
+patrón que Fase 6 (BLE): la lógica de armado/parseo de requests vive en
+`RunCoachCore` (**73 tests en total**), el cliente HTTP real vive en
+`RunCoach-iOS`. Sin API key configurada todavía.
+
+**Fase 12** (Apple Developer / firma) — **bloqueada esperando a
+Vicente**. Primera fase gateada casi por completo por una acción suya:
+inscribirse en el Apple Developer Program (USD 99/año, pago +
+verificación de identidad, 1-3 días de aprobación) y, una vez aprobado,
+crear una API key de App Store Connect para que Codemagic pueda firmar
+automáticamente. Ver [docs/ios-build.md](docs/ios-build.md#fase-12--apple-developer--firma)
+para el plan completo investigado. No hay nada que yo pueda avanzar acá
+sin esa cuenta — ver el mensaje de esta sesión para la acción exacta que
+le pedí a Vicente.
 
 Nota de proceso (desde Fase 5): el trigger automático por `push` de
 Codemagic no dispara solo — hay que iniciar el build a mano desde el
@@ -40,8 +45,12 @@ Ver `git log --oneline -1` para el hash exacto.
 
 ## Bloqueos
 
-Ninguno activo (la falta de API key de OpenAI no bloquea el desarrollo —
-la app funciona igual sin ella, solo sin recomendaciones enriquecidas).
+- **Fase 12 bloqueada esperando que Vicente se inscriba en el Apple
+  Developer Program.** No es algo que yo pueda hacer ni acelerar — pago,
+  verificación de identidad, y una aprobación de Apple que toma 1-3 días.
+  Ver [docs/ios-build.md](docs/ios-build.md#fase-12--apple-developer--firma).
+- La falta de API key de OpenAI (Fase 11) no bloquea nada — la app
+  funciona igual sin ella, solo sin recomendaciones enriquecidas.
 
 ## Entorno Windows
 
@@ -150,6 +159,9 @@ Ver [docs/decisions.md](docs/decisions.md) para el detalle y motivos:
 21. "Sin recomendación" (`nil`) es un resultado válido de
     `OpenAICoachClient`, nunca un error que se propague — simplifica el
     llamador y refuerza que la red nunca bloquea nada.
+22. Firma automática vía API key de App Store Connect en Codemagic (Fase
+    12), en vez de exportar/subir certificados `.p12` a mano — más simple
+    y es el método que recomienda la documentación de Codemagic.
 
 ## Arquitectura
 
@@ -195,9 +207,10 @@ Repo en GitHub: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/Run
 
 ## Próxima tarea
 
-Esperar "Continuar con Fase 12" (Apple Developer / firma) de Vicente.
-**Esa fase va a necesitar una acción de Vicente distinta a las
-anteriores**: crear/pagar una cuenta de Apple Developer Program — algo
-que nunca se hace de forma autónoma. También sería el momento natural
-para que Vicente cree la API key de OpenAI si quiere probarla (opcional,
-no bloquea nada).
+Esperando que Vicente complete el Paso 1 de
+[docs/ios-build.md#fase-12](docs/ios-build.md#fase-12--apple-developer--firma):
+inscribirse en el Apple Developer Program. Cuando esté aprobado (1-3
+días), me pasa el Team ID y seguimos con el Paso 2 (API key de App Store
+Connect → Codemagic) y el Paso 3 (actualizar `project.yml`/`codemagic.yaml`
+para firma automática).
+
