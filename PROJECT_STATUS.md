@@ -9,14 +9,15 @@
 **Fase 0** (entorno Windows) — **completada**.
 **Fase 1** (arquitectura/investigación) — **completada**.
 **Fase 2** (RunCoachCore: modelos, métricas, `RunState`) — **completada**.
+**Fase 3** (Simulation Engine) — **completada**.
 
-Fase 3 (Simulation Engine) es la siguiente, a la espera de que Vicente
-confirme para arrancarla.
+Fase 4 (Proyecto iOS + CI macOS) es la siguiente, a la espera de que
+Vicente confirme para arrancarla.
 
 ## Último commit estable
 
-Ver `git log --oneline -1` para el hash exacto. Incluye Fase 0, Fase 1 y
-Fase 2.
+Ver `git log --oneline -1` para el hash exacto. Incluye Fase 0, Fase 1,
+Fase 2 y Fase 3.
 
 ## Entorno Windows
 
@@ -37,23 +38,32 @@ nueva, en [docs/windows-development.md](docs/windows-development.md).
 
 ## Tests en Windows
 
-**`swift build` y `swift test` corren en verde**: 22 tests, 0 fallas, en
+**`swift build` y `swift test` corren en verde**: 40 tests, 0 fallas, en
 `RunCoachCore` (usando `scripts/setup-swift-env.ps1` para cargar el entorno
 de VS + `SDKROOT`). Cobertura actual:
 
-- `MovingAverageTests` (3 tests)
-- `GeoDistanceTests` (3 tests)
-- `HeartRateTrendTests` (4 tests)
-- `RunStateTests` (12 tests): FC suavizada, tendencia de FC (subida y
-  vuelta a estable), acumulación de distancia, ritmo suavizado, muestras
-  fuera de orden, generación de splits (uno, ninguno, múltiples), promedio
-  de FC por split.
+- `MovingAverageTests` (3), `GeoDistanceTests` (3), `HeartRateTrendTests`
+  (4): utilidades de métricas.
+- `RunStateTests` (12): FC suavizada, tendencia de FC, distancia, ritmo,
+  splits.
+- `ScenarioSegmentTests` (4): interpolación lineal de ritmo/FC.
+- `ScenarioSimulatorTests` (5): generación de muestras, pérdida de señal,
+  anomalías.
+- `MockSourceTests` (4): reproducción de fuentes simuladas hacia
+  `RunState`.
+- `ReferenceScenarioTests` (5): el escenario de referencia de 20 minutos
+  de punta a punta — duración, distancia/splits plausibles, y tendencia de
+  FC correcta en cada fase (estable → subiendo → bajando).
 
-Durante la implementación de `RunState` se encontró y corrigió un bug real:
-`elapsedSeconds` se actualizaba *después* de chequear si correspondía
-generar un split, así que el split quedaba con la duración de la muestra
-anterior en vez de la actual. Ya corregido y cubierto por test
-(`testSplitGeneratedWhenCrossingThreshold`).
+Bugs reales encontrados y corregidos durante la implementación:
+
+- **Fase 2**: `elapsedSeconds` se actualizaba *después* de chequear si
+  correspondía generar un split, así que el split quedaba con la duración
+  de la muestra anterior en vez de la actual.
+- **Fase 3**: ninguno — el diseño de integración a 1s con emisión
+  desacoplada funcionó a la primera una vez corregido el bug de Fase 2 (los
+  tests de distancia del simulador dependen de la misma lógica de
+  `RunState`).
 
 ## Build iOS
 
@@ -78,7 +88,11 @@ Ver [docs/decisions.md](docs/decisions.md) para el detalle y motivos:
    existe en Windows/Linux).
 7. Timestamps como `TimeInterval` relativo (segundos desde el inicio de la
    carrera), no `Date` — determinismo para tests y para el Simulation
-   Engine (Fase 3).
+   Engine.
+8. Simulation Engine con reproducción síncrona e inmediata (sin
+   temporizador real) en `MockHeartRateSource`/`MockLocationSource` — el
+   ritmo en tiempo real para pruebas interactivas queda para cuando haga
+   falta (Fase 9+), sin necesidad de cambiar el protocolo.
 
 ## Arquitectura
 
@@ -88,7 +102,7 @@ CoreBluetooth/CoreLocation/AVFoundation, compilado solo en CI macOS). El
 motor de carrera nunca depende de la red; OpenAI se consulta solo ante
 eventos relevantes, de forma no bloqueante.
 
-**RunCoachCore implementado hasta ahora** (Fase 2):
+**RunCoachCore implementado hasta ahora** (Fases 2-3):
 
 ```
 RunCoachCore/Sources/RunCoachCore/
@@ -103,12 +117,19 @@ RunCoachCore/Sources/RunCoachCore/
 ├── Sources/
 │   ├── HeartRateSource.swift   (protocolo)
 │   └── LocationSource.swift    (protocolo)
+├── Simulation/
+│   ├── ScenarioAnomaly.swift
+│   ├── ScenarioSegment.swift
+│   ├── Scenario.swift          (incluye Scenario.referenceRun)
+│   ├── ScenarioSimulator.swift
+│   ├── MockHeartRateSource.swift
+│   └── MockLocationSource.swift
 └── RunState.swift              (motor de ingestión y estado)
 ```
 
-Explícitamente **fuera de alcance de Fase 2** (quedan para más adelante):
-Simulation Engine (Fase 3), detección de eventos más allá de tendencia de
-FC (Fase 8), Coach Decision Engine (Fase 10).
+Explícitamente **fuera de alcance de Fases 2-3** (quedan para más
+adelante): detección de eventos más allá de tendencia de FC (Fase 8),
+Coach Decision Engine (Fase 10).
 
 ## Hardware
 
@@ -148,11 +169,21 @@ RunCoachCore/Sources/RunCoachCore/Metrics/GeoDistance.swift
 RunCoachCore/Sources/RunCoachCore/Metrics/HeartRateTrend.swift
 RunCoachCore/Sources/RunCoachCore/Sources/HeartRateSource.swift
 RunCoachCore/Sources/RunCoachCore/Sources/LocationSource.swift
+RunCoachCore/Sources/RunCoachCore/Simulation/ScenarioAnomaly.swift
+RunCoachCore/Sources/RunCoachCore/Simulation/ScenarioSegment.swift
+RunCoachCore/Sources/RunCoachCore/Simulation/Scenario.swift
+RunCoachCore/Sources/RunCoachCore/Simulation/ScenarioSimulator.swift
+RunCoachCore/Sources/RunCoachCore/Simulation/MockHeartRateSource.swift
+RunCoachCore/Sources/RunCoachCore/Simulation/MockLocationSource.swift
 RunCoachCore/Sources/RunCoachCore/RunState.swift
 RunCoachCore/Tests/RunCoachCoreTests/MovingAverageTests.swift
 RunCoachCore/Tests/RunCoachCoreTests/GeoDistanceTests.swift
 RunCoachCore/Tests/RunCoachCoreTests/HeartRateTrendTests.swift
 RunCoachCore/Tests/RunCoachCoreTests/RunStateTests.swift
+RunCoachCore/Tests/RunCoachCoreTests/ScenarioSegmentTests.swift
+RunCoachCore/Tests/RunCoachCoreTests/ScenarioSimulatorTests.swift
+RunCoachCore/Tests/RunCoachCoreTests/MockSourceTests.swift
+RunCoachCore/Tests/RunCoachCoreTests/ReferenceScenarioTests.swift
 docs/architecture.md
 docs/decisions.md
 docs/hardware.md
@@ -166,14 +197,14 @@ docs/windows-development.md
 ## Git
 
 Repo local inicializado (`main`), `.gitignore` configurado, commits hechos
-para Fase 0/1 y Fase 2. Sin remoto en GitHub todavía (se conecta en
+para Fase 0/1, Fase 2 y Fase 3. Sin remoto en GitHub todavía (se conecta en
 Fase 4).
 
 ## Próxima tarea
 
-Esperar confirmación explícita de Vicente ("Continuar con Fase 3") antes de
-empezar el Simulation Engine: fuente de datos sintética que implemente
-`HeartRateSource`/`LocationSource`, con escenarios reproducibles (tiempo,
-FC, GPS, fatiga, aceleraciones, recuperación, anomalías, pérdida temporal
-de señal) — incluyendo el escenario de referencia de 20 minutos descrito en
-[docs/testing.md](docs/testing.md).
+Esperar confirmación explícita de Vicente ("Continuar con Fase 4") antes de
+empezar el proyecto iOS: `project.yml` (XcodeGen), `codemagic.yaml`,
+conectar un repo en GitHub (requiere que Vicente autorice/loguee la
+cuenta), y el primer build vacío validado en CI. Fase 4 es la primera que
+va a requerir intervención de Vicente (crear/loguear cuentas de GitHub y
+Codemagic).

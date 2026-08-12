@@ -38,10 +38,26 @@ Simulation Engine debe poder generar, de forma determinista y reproducible:
 15–20 min: recuperación
 ```
 
-Este escenario se implementa como un caso de test en Fase 3 y sirve como
-"golden path" para validar el Coach Decision Engine: se espera que NO hable
-en los primeros minutos, y que sí genere como máximo una intervención
-relevante alrededor del minuto 15.
+**Implementado en Fase 3** como `Scenario.referenceRun`
+(`RunCoachCore/Sources/RunCoachCore/Simulation/Scenario.swift`): cuatro
+segmentos de 5 minutos cada uno (calentamiento, aumento de ritmo, esfuerzo
+sostenido, recuperación). El "evento importante" del minuto 15 se modela
+como **deriva cardíaca sostenida** (la FC sigue subiendo aunque el ritmo ya
+se estabilizó, del minuto 10 al 15) — es una tendencia real de varios
+minutos, no un glitch puntual, y es lo que el Coach Decision Engine (Fase
+10) va a tener que detectar vía `RunState.heartRateTrend`.
+
+Cubierto por `ReferenceScenarioTests` (`RunCoachCoreTests`): duración total
+de 20 minutos, distancia/splits plausibles corriendo el escenario completo
+a través de `MockHeartRateSource`/`MockLocationSource` → `RunState`, y que
+la tendencia de FC sea `.stable` durante el calentamiento, `.rising`
+durante el aumento de ritmo, y `.falling` durante la recuperación.
+
+Este escenario sirve como "golden path" para validar, más adelante, el
+Coach Decision Engine (Fase 10): se espera que NO hable en los primeros
+minutos, y que sí genere como máximo una intervención relevante alrededor
+del minuto 15 — eso todavía no está implementado ni testeado, porque el
+Coach Decision Engine es una fase aparte.
 
 ## Criterio de "no hablar por defecto"
 
@@ -53,6 +69,16 @@ ejemplo, ≤ 2-3 en 20 minutos de simulación), no una por cada muestra.
 
 ## Estado actual
 
-Fase 0: solo existe un test placeholder (`RunCoachCoreTests.swift`) que
-valida que el toolchain de Swift compila y corre tests en Windows. Los tests
-reales de dominio y del Simulation Engine se escriben en las Fases 2 y 3.
+**Fase 3 completada.** 40 tests en verde (`swift test`), cubriendo:
+
+- Fase 2: modelos, métricas (`MovingAverage`, `GeoDistance`,
+  `HeartRateTrend`), y `RunState` (splits, distancia, ritmo, tendencia).
+- Fase 3: interpolación de segmentos (`ScenarioSegmentTests`), generación
+  determinista de muestras incluyendo pérdida de señal y anomalías
+  (`ScenarioSimulatorTests`), reproducción de fuentes simuladas
+  (`MockSourceTests`), y el escenario de referencia de 20 minutos de punta
+  a punta (`ReferenceScenarioTests`).
+
+Explícitamente sin cubrir todavía (fases futuras): Coach Decision Engine
+(Fase 10), UI/integración iOS (Fase 5+), pruebas con hardware real (Fases
+17-18).

@@ -74,10 +74,18 @@ Windows.
   BLE/GPS reales (Fases 6-7) van a implementar, para que `RunState` sea
   agnóstico del origen de los datos.
 
-**Pendiente (fases futuras, explícitamente fuera de alcance de Fase 2):**
+**Implementado (Fase 3):**
 
-- **Simulation Engine** (Fase 3): fuente de datos sintética con escenarios
-  reproducibles (ver [docs/testing.md](testing.md)).
+- **Simulation Engine** (`Simulation/`): `ScenarioSegment` (interpolación
+  lineal de ritmo/FC, pérdida de señal, anomalías puntuales), `Scenario`
+  (secuencia de segmentos, incluye `Scenario.referenceRun` — el escenario
+  de 20 minutos de [docs/testing.md](testing.md)), `ScenarioSimulator`
+  (genera `[HeartRateSample]`/`[LocationSample]` deterministas a partir de
+  un escenario), y `MockHeartRateSource`/`MockLocationSource` (implementan
+  los protocolos de Fase 2 reproduciendo esas muestras).
+
+**Pendiente (fases futuras, explícitamente fuera de alcance de Fase 2/3):**
+
 - **Detección de eventos** más allá de la tendencia de FC: deterioro,
   recuperación, desviación de objetivo (Fase 8, Run Data Engine completo).
 - **Coach Decision Engine** (Fase 10): prioridades, cooldown, deduplicación,
