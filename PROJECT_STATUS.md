@@ -19,6 +19,11 @@ de verdad: 8 tests nuevos en verde en Windows. La parte de CoreBluetooth
 (`BLEHeartRateSource`) solo está validada por compilación — **ni siquiera
 el simulador de iOS sirve para probar BLE real**, así que sigue
 funcionalmente sin verificar hasta tener hardware real (Fase 14).
+**Fase 7** (GPS) — **implementada, pendiente de confirmar build de CI**.
+`GPSLocationSource` (CoreLocation) sigue el mismo patrón que Fase 6:
+válido solo por compilación de mi lado (sin Mac). A diferencia de BLE, el
+simulador de iOS sí soporta simular ubicación — pero sin Mac para abrir
+Xcode, la diferencia práctica con Fase 6 es nula por ahora.
 
 Nota de proceso (desde Fase 5): el trigger automático por `push` de
 Codemagic no está disparando solo — hay que iniciar el build a mano desde
@@ -58,11 +63,10 @@ lograr esto.
 
 ## Build iOS
 
-**Fases 4, 5 y 6 validadas en CI real** (builds verdes). Para Fase 6 en
-particular: el build verde solo confirma que `BLEHeartRateSource` compila
-contra las APIs de CoreBluetooth — no que funcione con un sensor real,
-algo que no se puede probar sin hardware (Fase 14) ni en el simulador de
-iOS (no tiene radio Bluetooth).
+**Fases 4, 5 y 6 validadas en CI real** (builds verdes). **Fase 7:
+pendiente de confirmar** — ver "Próxima tarea". Para Fase 6/7 en general:
+un build verde solo confirma que el código compila contra las APIs de
+CoreBluetooth/CoreLocation — no que funcione con hardware/GPS real.
 
 ### Qué se agregó en Fase 6
 
@@ -87,6 +91,24 @@ iOS (no tiene radio Bluetooth).
   probarlo con hardware real.
 - No hay soporte para múltiples sensores ni selección manual — se conecta
   al primero que encuentre exponiendo el servicio estándar.
+
+### Qué se agregó en Fase 7
+
+- `RunCoach-iOS/App/GPS/GPSLocationSource.swift`: implementa
+  `LocationSource` con `CLLocationManager`. Pide autorización "When In
+  Use" (no "Always" — eso es Fase 15), `activityType: .fitness`,
+  `pausesLocationUpdatesAutomatically: false`. Convierte cada
+  `CLLocation` a un `LocationSample` con timestamp relativo a un `Date`
+  de referencia fijado en `start()` (mismo patrón que Fase 6).
+
+### Qué NO se hizo en Fase 7 (a propósito)
+
+- No se pide autorización "Always" ni se valida background tracking real
+  — eso es explícitamente la Fase 15 del roadmap.
+- No se wireó a la UI — Fase 8, igual que BLE.
+- Sin manejo elaborado de errores (`didFailWithError` vacío por ahora) —
+  mismo criterio que en Fase 6: afinar con datos reales tiene más sentido
+  que adivinar sin ellos.
 
 ## Decisiones tomadas
 
@@ -113,6 +135,8 @@ Ver [docs/decisions.md](docs/decisions.md) para el detalle y motivos:
 14. Timestamp de `BLEHeartRateSource` calculado contra un `Date` de
     referencia fijado en `start()` — a revisar en Fase 8 si todas las
     fuentes deben compartir un único punto de referencia.
+15. `GPSLocationSource` solo pide autorización "When In Use" — "Always" y
+    la validación de background real quedan para Fase 15.
 
 ## Arquitectura
 
@@ -131,17 +155,16 @@ pero sigue sin validarse con ningún sensor real.
 ## Riesgos identificados
 
 Ver tabla completa en [docs/architecture.md](docs/architecture.md#riesgos-identificados-fase-1).
-Nuevo en Fase 6: `BLEHeartRateSource` es el primer código que ni siquiera
-el simulador de iOS puede ejercitar — el riesgo de "código nunca antes
-corrido" es mayor acá que en Fases 4-5. Mitigado parcialmente separando
-el parsing (sí testeado) del transporte BLE (no testeable hasta Fase 14).
+`BLEHeartRateSource` (Fase 6) y ahora `GPSLocationSource` (Fase 7) son
+código que no se pudo ejercitar de ninguna forma de mi lado — ni Windows,
+ni siquiera el simulador de iOS (para GPS en teoría sí se podría, pero sin
+Mac para abrir Xcode da lo mismo). El riesgo de "código nunca antes
+corrido" se mantiene hasta las Fases 14-15.
 
-## Archivos creados (nuevos en Fase 6)
+## Archivos creados (nuevos en Fase 7)
 
 ```
-RunCoachCore/Sources/RunCoachCore/BLE/HeartRateMeasurementParser.swift
-RunCoachCore/Tests/RunCoachCoreTests/HeartRateMeasurementParserTests.swift
-RunCoach-iOS/App/BLE/BLEHeartRateSource.swift
+RunCoach-iOS/App/GPS/GPSLocationSource.swift
 ```
 
 ## Git
@@ -151,8 +174,9 @@ Repo en GitHub: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/Run
 
 ## Próxima tarea
 
-Esperar "Continuar con Fase 7" (GPS) de Vicente. Recordar que, igual que
-BLE, GPS real (`CoreLocation`) tampoco se va a poder probar de verdad sin
-un iPhone (el simulador de iOS sí puede simular ubicación, a diferencia de
-Bluetooth, así que Fase 7 debería ser algo más verificable que Fase 6 —
-a confirmar cuando se llegue ahí).
+Confirmar con Vicente el build de Codemagic para el commit de Fase 7 (hay
+que iniciarlo a mano). Si pasa, Fase 7 queda completa en el sentido de
+"compila". Después, esperar "Continuar con Fase 8" (Run Data Engine
+completo) — ahí es cuando `BLEHeartRateSource` y `GPSLocationSource`
+finalmente se conectan a la UI, reemplazando la simulación para carreras
+reales.

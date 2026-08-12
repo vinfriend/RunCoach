@@ -115,8 +115,24 @@ Todo lo específico de Apple:
 - `HistoryView`/`SettingsView`: placeholders que señalan explícitamente
   qué fase futura los implementa de verdad.
 
-Como no hay Mac local, este código solo se valida por CI (compila para
-simulador) — nunca se vio corriendo. Ver PROJECT_STATUS.md para el
+**Implementado (Fase 6-7):**
+
+- `BLEHeartRateSource` (Fase 6, `App/BLE/`) — ver detalle en la sección
+  "HeartRateSource" abajo.
+- `GPSLocationSource` (Fase 7, `App/GPS/`) — implementa `LocationSource`
+  con `CLLocationManager`. Pide autorización "When In Use" (no "Always"
+  todavía — eso, junto con la validación real de background, es la Fase
+  15), `activityType: .fitness`, `pausesLocationUpdatesAutomatically:
+  false` para no perder tracking en semáforos/esperas. A diferencia de
+  BLE, el simulador de iOS sí puede simular una ubicación GPS (Xcode:
+  Debug > Simulate Location) — pero sin Mac para abrir Xcode, sigue sin
+  poder probarse de este lado, igual que BLE.
+
+Ninguno de los dos (`BLEHeartRateSource`, `GPSLocationSource`) está
+conectado a la UI todavía — eso es Fase 8 (Run Data Engine completo).
+
+Como no hay Mac local, todo este código solo se valida por CI (compila
+para simulador) — nunca se vio corriendo. Ver PROJECT_STATUS.md para el
 resultado real del build.
 
 ## HeartRateSource: independencia de marca

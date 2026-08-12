@@ -260,3 +260,31 @@ HR y GPS sean comparables entre sí. Queda para Fase 8, no se resuelve acá.
 **Sin validar con hardware real.** Como el resto de Fase 6, esto es una
 decisión de diseño razonada, no confirmada empíricamente — no hay forma de
 confirmarla sin un sensor real (Fase 14).
+
+---
+
+## 2026-08-11 — Fase 7: solo autorización "When In Use", "Always" queda para Fase 15
+
+**Decisión**: `GPSLocationSource` pide únicamente
+`requestWhenInUseAuthorization()`. No pide `requestAlwaysAuthorization()`
+en esta fase.
+
+**Motivo**: el roadmap separa Fase 7 ("GPS") de Fase 15 ("GPS/background
+real") a propósito. Pedir "Always" tiene sentido recién cuando se pueda
+mostrarle al usuario por qué hace falta (patrón recomendado por Apple:
+pedir "When In Use" primero, mostrar valor, pedir "Always" después con un
+motivo concreto) y cuando haya forma de probar que el tracking en
+background realmente sobrevive — nada de eso existe todavía. El código
+deja el terreno preparado (`allowsBackgroundLocationUpdates` condicionado
+a que la autorización ya sea "Always") sin forzar el flujo completo.
+
+**Impacto**: mientras no se pida "Always", el tracking en background real
+(con la pantalla bloqueada) no va a funcionar — es exactamente el
+comportamiento esperado hasta Fase 15, no un bug.
+
+**A diferencia de BLE (Fase 6)**: el simulador de iOS sí puede simular
+ubicación (Debug > Simulate Location en Xcode), así que en teoría esta
+fase es más verificable que la anterior — pero sin Mac para abrir Xcode,
+la diferencia práctica es nula por ahora. Documentado para que quede claro
+que la limitación actual es "no tenemos Mac", no "CoreLocation no se puede
+probar nunca sin hardware" (que sí sería el caso de BLE).
