@@ -11,16 +11,17 @@
 **Fase 2** (RunCoachCore: modelos, métricas, `RunState`) — **completada**.
 **Fase 3** (Simulation Engine) — **completada**.
 **Fase 4** (Proyecto iOS + CI macOS) — **completada**.
-**Fase 5** (UI SwiftUI) — **completada**. Build de Codemagic para el commit
-`58b7a87` terminó `finished` sin pasos fallidos (1m 22s) — confirma que
-compila. **Nota importante**: "compila en CI" no es lo mismo que "se ve o
-funciona bien" — nunca se corrió en un simulador/iPhone real (no hay Mac).
-Eso queda pendiente de las Fases 12-13.
+**Fase 5** (UI SwiftUI) — **completada**.
+**Fase 6** (BLE) — **implementada, pendiente de confirmar build de CI**.
+La parte de parsing (`HeartRateMeasurementParser`) sí está validada de
+verdad: 8 tests nuevos en verde en Windows. La parte de CoreBluetooth
+(`BLEHeartRateSource`) solo se puede validar por compilación — **ni
+siquiera el simulador de iOS sirve para probar BLE real**, así que esto
+queda funcionalmente sin verificar hasta tener hardware real (Fase 14).
 
-Nota de proceso: el trigger automático por `push` de Codemagic no disparó
-build para los últimos commits — hubo que iniciarlos a mano desde el
-dashboard ("Start new build"). Puede ser una configuración de webhook a
-revisar más adelante si se vuelve molesto; por ahora no bloquea nada.
+Nota de proceso (desde Fase 5): el trigger automático por `push` de
+Codemagic no está disparando solo — hay que iniciar el build a mano desde
+el dashboard ("Start new build") cada vez.
 
 ## Último commit estable
 
@@ -48,46 +49,44 @@ Detalle completo en [docs/windows-development.md](docs/windows-development.md).
 
 ## Tests en Windows
 
-Sin cambios respecto a Fase 3: **40 tests, 0 fallas**, en `RunCoachCore`.
-Fase 4 y Fase 5 no agregaron lógica a `RunCoachCore` — todo lo nuevo vive
-en `RunCoach-iOS`, que no se puede testear en Windows (ver
-[docs/windows-development.md](docs/windows-development.md)).
+**48 tests, 0 fallas**, en `RunCoachCore` (40 de Fases 2-3 + 8 nuevos de
+`HeartRateMeasurementParserTests` en Fase 6). Es la primera vez que una
+fase "de hardware" deja algo realmente testeado en Windows — separar el
+parsing GATT (portable) de CoreBluetooth (no portable) fue justo para
+lograr esto.
 
 ## Build iOS
 
-**Fase 4 y Fase 5 validadas en CI real** (ambos builds verdes). Recordar
-siempre: un build verde en Codemagic **solo confirma que compila** — no
-que la UI se vea bien, que la navegación funcione, o que el timing de la
-simulación sea razonable. Eso requiere correrlo en un simulador o iPhone
-real, que todavía no tenemos (Fases 12-13).
+**Fases 4 y 5 validadas en CI real** (builds verdes). **Fase 6 (BLE):
+pendiente de confirmar el build de CI para este commit** — ver "Próxima
+tarea". Incluso si el build pasa, eso solo confirma que `BLEHeartRateSource`
+compila contra las APIs de CoreBluetooth — no que funcione con un sensor
+real, algo que no se puede probar sin hardware (Fase 14) ni en el
+simulador de iOS (no tiene radio Bluetooth).
 
-### Qué se agregó en Fase 5
+### Qué se agregó en Fase 6
 
-- `RunCoach-iOS/App/ViewModels/RunSessionViewModel.swift`: `ObservableObject`
-  que envuelve `RunState` + `ScenarioSimulator` de `RunCoachCore` (Fase 3)
-  con pacing en tiempo real acelerado (20x por defecto, usando
-  `DispatchQueue.main.asyncAfter`) — el escenario de 20 minutos se ve en
-  ~1 minuto. Este pacing vive acá (no en `RunCoachCore`) porque usa
-  `DispatchQueue`, que no existe en Windows/Linux.
-- `RunCoach-iOS/App/Views/RunView.swift`: pantalla de carrera. Estado
-  inicial con botón "Iniciar carrera (simulación)" y aviso explícito de
-  que no hay sensores reales todavía; estado corriendo con tiempo
-  transcurrido, distancia, ritmo, FC + ícono de tendencia, y lista de
-  splits a medida que se completan.
-- `RunCoach-iOS/App/Views/HistoryView.swift` y `SettingsView.swift`:
-  placeholders honestos, cada uno indicando en qué fase futura se
-  implementa de verdad (Fase 19 y Fase 6/11 respectivamente).
-- `RunCoach-iOS/App/ContentView.swift`: reemplaza el placeholder de Fase 4
-  por un `TabView` real (Correr / Historial / Ajustes).
+- `RunCoachCore/Sources/RunCoachCore/BLE/HeartRateMeasurementParser.swift`:
+  decodifica el payload de la característica Heart Rate Measurement
+  (`0x2A37`) según la spec del Bluetooth SIG (formato UINT8/UINT16,
+  ignorando energy expended/RR-interval). Lógica pura, sin CoreBluetooth
+  — testeada en Windows.
+- `RunCoach-iOS/App/BLE/BLEHeartRateSource.swift`: implementa
+  `HeartRateSource` con `CBCentralManager`/`CBPeripheral`. Escanea el
+  servicio `0x180D`, conecta, se suscribe a notificaciones de `0x2A37`,
+  reconecta automáticamente ante desconexión. Usa
+  `HeartRateMeasurementParser` para decodificar cada valor.
 
-### Qué NO se hizo en Fase 5 (a propósito)
+### Qué NO se hizo en Fase 6 (a propósito)
 
-- Nada de BLE (Fase 6) ni GPS real (Fase 7) — la pantalla de carrera solo
-  consume el escenario simulado.
-- Nada de audio/voz (Fase 9) ni Coach Decision Engine (Fase 10) — no hay
-  ninguna recomendación hablada todavía, solo métricas numéricas en
-  pantalla.
-- Nada de persistencia — el historial es un placeholder vacío.
+- No se wireó `BLEHeartRateSource` a la UI (`RunView`) — eso es Fase 8
+  ("Run Data Engine completo"), cuando se reemplace la simulación por
+  fuentes reales de verdad.
+- No hay manejo elaborado de errores/estados de Bluetooth (apagado, sin
+  permisos) más allá de lo mínimo — no tiene sentido afinar eso sin poder
+  probarlo con hardware real.
+- No hay soporte para múltiples sensores ni selección manual — se conecta
+  al primero que encuentre exponiendo el servicio estándar.
 
 ## Decisiones tomadas
 
@@ -106,42 +105,44 @@ Ver [docs/decisions.md](docs/decisions.md) para el detalle y motivos:
    sources.
 9. Bundle ID `com.vicente.runcoach` como placeholder hasta Fase 12.
 10. Primer build de CI sin firma (solo simulador).
-11. `info.path` es obligatorio en el bloque `info:` de XcodeGen (bug real
-    encontrado y corregido en el primer build de Fase 4).
-12. Pacing en tiempo real de la simulación vive en `RunCoach-iOS`
-    (`RunSessionViewModel`), no en `RunCoachCore` — usa `DispatchQueue`,
-    rompería la portabilidad a Windows si estuviera en el core.
+11. `info.path` es obligatorio en el bloque `info:` de XcodeGen.
+12. Pacing en tiempo real de la simulación vive en `RunCoach-iOS`, no en
+    `RunCoachCore`.
+13. Parsing GATT del Heart Rate Service vive en `RunCoachCore` (portable,
+    testeable en Windows); CoreBluetooth vive en `RunCoach-iOS`.
+14. Timestamp de `BLEHeartRateSource` calculado contra un `Date` de
+    referencia fijado en `start()` — a revisar en Fase 8 si todas las
+    fuentes deben compartir un único punto de referencia.
 
 ## Arquitectura
 
-Resumen en [docs/architecture.md](docs/architecture.md). Fase 5 no cambió
-el diseño de fondo — agregó la capa de presentación (SwiftUI) sobre
-`RunCoachCore`, consumiendo el Simulation Engine de Fase 3 tal como estaba
-previsto ("el mismo motor consume fuentes simuladas y reales").
+Resumen en [docs/architecture.md](docs/architecture.md). Fase 6 reforzó el
+patrón "todo lo que sea lógica pura va en RunCoachCore, aunque esté
+relacionado con BLE" — no todo lo que toca hardware es automáticamente
+código de plataforma.
 
 ## Hardware
 
-Sin cambios respecto a Fase 1. Ver [docs/hardware.md](docs/hardware.md).
-Sin compras realizadas.
+Sin cambios respecto a Fase 1 en cuanto a investigación. Ver
+[docs/hardware.md](docs/hardware.md). Sin compras realizadas.
+`BLEHeartRateSource` implementa el protocolo estándar investigado ahí,
+pero sigue sin validarse con ningún sensor real.
 
 ## Riesgos identificados
 
 Ver tabla completa en [docs/architecture.md](docs/architecture.md#riesgos-identificados-fase-1).
-Nuevo en Fase 5: el código de `RunCoach-iOS` (SwiftUI) nunca se compiló ni
-se vio corriendo antes de este commit — ni siquiera hay certeza de que el
-build de CI ya haya corrido. Es el mismo riesgo estructural de no tener Mac
-local, ahora aplicado a código de UI en vez de solo configuración.
+Nuevo en Fase 6: `BLEHeartRateSource` es el primer código que ni siquiera
+el simulador de iOS puede ejercitar — el riesgo de "código nunca antes
+corrido" es mayor acá que en Fases 4-5. Mitigado parcialmente separando
+el parsing (sí testeado) del transporte BLE (no testeable hasta Fase 14).
 
-## Archivos creados (nuevos en Fase 5)
+## Archivos creados (nuevos en Fase 6)
 
 ```
-RunCoach-iOS/App/ViewModels/RunSessionViewModel.swift
-RunCoach-iOS/App/Views/RunView.swift
-RunCoach-iOS/App/Views/HistoryView.swift
-RunCoach-iOS/App/Views/SettingsView.swift
+RunCoachCore/Sources/RunCoachCore/BLE/HeartRateMeasurementParser.swift
+RunCoachCore/Tests/RunCoachCoreTests/HeartRateMeasurementParserTests.swift
+RunCoach-iOS/App/BLE/BLEHeartRateSource.swift
 ```
-
-(`RunCoach-iOS/App/ContentView.swift` se modificó, no es nuevo.)
 
 ## Git
 
@@ -150,7 +151,8 @@ Repo en GitHub: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/Run
 
 ## Próxima tarea
 
-Esperar confirmación explícita de Vicente ("Continuar con Fase 6") antes de
-empezar BLE real (`BLEHeartRateSource` con CoreBluetooth, contra el
-Heart Rate Service estándar 0x180D investigado en Fase 1). Recordar que
-sigue sin poder probarse con hardware real hasta las Fases 12-14.
+Confirmar con Vicente el resultado del build de Codemagic para el commit
+de Fase 6 (hay que iniciarlo a mano, ver nota de proceso arriba). Si pasa,
+Fase 6 queda "completa" en el sentido de "compila" — con la salvedad ya
+mencionada de que sigue sin validarse funcionalmente. Después, esperar
+"Continuar con Fase 7" (GPS) de Vicente.

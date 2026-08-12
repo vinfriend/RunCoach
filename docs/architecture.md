@@ -134,14 +134,21 @@ exclusivo de plataformas Apple y no existe en el toolchain de Swift para
 Windows/Linux, así que hubiera roto la posibilidad de testear
 `RunCoachCore` fuera de macOS. `LocationSource` sigue el mismo patrón.
 
-Implementaciones previstas:
+Implementaciones:
 
-- `MockHeartRateSource` — Fase 3, alimenta desde el Simulation Engine.
-- `BLEHeartRateSource` — Fase 6, cualquier sensor que exponga el servicio
-  Bluetooth estándar Heart Rate Service (`0x180D`) con la característica
-  Heart Rate Measurement (`0x2A37`). Esto cubre WHOOP (con HR Broadcast
-  activado), Polar H10/Verity Sense, Garmin HRM-Dual/Pro, Scosche Rhythm24,
-  Wahoo TICKR, etc. — ver [docs/hardware.md](hardware.md).
+- `MockHeartRateSource` (Fase 3) — alimenta desde el Simulation Engine.
+- `BLEHeartRateSource` (Fase 6, `RunCoach-iOS/App/BLE/`) — CoreBluetooth
+  contra el servicio Bluetooth estándar Heart Rate Service (`0x180D`) con
+  la característica Heart Rate Measurement (`0x2A37`). Esto cubre WHOOP
+  (con HR Broadcast activado), Polar H10/Verity Sense, Garmin HRM-Dual/Pro,
+  Scosche Rhythm24, Wahoo TICKR, etc. — ver [docs/hardware.md](hardware.md).
+  El parsing del payload (`HeartRateMeasurementParser`) vive en
+  `RunCoachCore` porque es lógica pura de bytes, sin dependencia de
+  CoreBluetooth — se testea en Windows. Lo que sí es exclusivo de Apple
+  (`CBCentralManager`, escaneo, conexión, notificaciones) vive en
+  `RunCoach-iOS`, sin poder probarse ni en el simulador de iOS (no tiene
+  radio Bluetooth real) — solo se valida por compilación hasta la Fase 14
+  con hardware de verdad.
 
 El resto del proyecto (UI, Coach Decision Engine, RunCoachCore) solo conoce
 el protocolo `HeartRateSource`, nunca una marca concreta.

@@ -211,3 +211,52 @@ la abstracción `HeartRateSource`/`LocationSource`.
 compilar ni ejecutar localmente — no hay Mac. Se valida únicamente vía el
 build de Codemagic (compila para simulador, no corre la UI). Ver
 PROJECT_STATUS.md para el resultado real una vez que corra en CI.
+
+---
+
+## 2026-08-11 — Fase 6: parsing GATT en RunCoachCore, CoreBluetooth en RunCoach-iOS
+
+**Decisión**: `HeartRateMeasurementParser` (decodifica el payload de la
+característica Heart Rate Measurement `0x2A37` según la spec del Bluetooth
+SIG) vive en `RunCoachCore`, no en `RunCoach-iOS`. `BLEHeartRateSource`
+(que sí usa `CBCentralManager`/`CBPeripheral`) vive en `RunCoach-iOS` y
+llama al parser de `RunCoachCore`.
+
+**Motivo**: decodificar bytes según un formato binario documentado es
+lógica pura, sin ninguna dependencia de CoreBluetooth — exactamente el
+tipo de cosa que puede (y debe) testearse en Windows con datos sintéticos,
+en vez de quedar bloqueada hasta tener hardware real (Fase 14). Separar
+"cómo hablarle a CoreBluetooth" de "cómo interpretar los bytes que llegan"
+resultó en la mayor parte de la lógica de Fase 6 siendo testeable de
+verdad (8 tests nuevos en Windows), y solo la cáscara de conexión BLE
+queda sin poder probarse hasta Fase 14.
+
+**Alternativas consideradas**: poner todo el parsing dentro de
+`BLEHeartRateSource` en `RunCoach-iOS` — descartado porque hubiera dejado
+esa lógica sin ningún test hasta tener un sensor físico, sin necesidad.
+
+---
+
+## 2026-08-11 — Fase 6: timestamp relativo vía `Date` de referencia
+
+**Decisión**: `BLEHeartRateSource` guarda un `referenceStartDate = Date()`
+al llamar `start()`, y calcula el `timestamp` de cada `HeartRateSample`
+como `Date().timeIntervalSince(referenceStartDate)`.
+
+**Motivo**: `HeartRateSample.timestamp` es un `TimeInterval` relativo al
+inicio de la carrera (decisión de Fase 2), pensado para que
+`ScenarioSimulator` genere datos deterministas sin usar el reloj real. Una
+fuente real como `BLEHeartRateSource` sí vive en tiempo real, así que
+necesita un punto de referencia contra el cual medir — se fija en el
+momento en que arranca (`start()`), que es cuando lógicamente arranca la
+carrera desde el punto de vista de esta fuente.
+
+**Impacto futuro**: cuando se wireé el pipeline completo (Fase 8), hay que
+decidir si todas las fuentes (BLE, GPS) comparten un único
+`referenceStartDate` fijado por quien orquesta la carrera, en vez de que
+cada fuente tenga el suyo — probablemente sí, para que los timestamps de
+HR y GPS sean comparables entre sí. Queda para Fase 8, no se resuelve acá.
+
+**Sin validar con hardware real.** Como el resto de Fase 6, esto es una
+decisión de diseño razonada, no confirmada empíricamente — no hay forma de
+confirmarla sin un sensor real (Fase 14).
