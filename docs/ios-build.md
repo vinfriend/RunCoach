@@ -81,10 +81,26 @@ es información nueva para corregir, no un fallo de la Fase 4.
 
 ## Estado actual
 
-- Cuenta de Codemagic: **no creada todavía** — requiere login/autorización
-  de Vicente (acción pendiente, ver PROJECT_STATUS.md).
-- Repo en GitHub: **no creado todavía** — requiere que Vicente cree el repo
-  y/o autorice `gh auth login` (acción pendiente).
-- `project.yml` / `codemagic.yaml`: **creados** (Fase 4). Sin validar en CI
-  todavía porque no hay repo/Codemagic conectados.
-- GitHub CLI (`gh`): instalado vía winget, sin autenticar todavía.
+- Repo en GitHub: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/RunCoach), `main` en sync.
+- Cuenta de Codemagic: conectada al repo.
+- `project.yml` / `codemagic.yaml`: **validados en CI real** — build
+  `runcoach-ios-unsigned-build` en verde (commit `dfa3980`, 1m 12s).
+- GitHub CLI (`gh`): instalado vía winget, sin autenticar en esta máquina
+  (no hizo falta — el push se hizo por HTTPS con credenciales ya
+  disponibles).
+
+### Bug encontrado y corregido en el primer build
+
+El primer intento falló en `xcodegen generate`:
+
+```
+Parsing project spec failed: Decoding failed at "path": Nothing found
+```
+
+Causa: el bloque `info:` de un target en `project.yml` requiere una
+propiedad `path` (dónde generar el `Info.plist`), no alcanza con declarar
+solo `properties`. Fix: agregar `info.path: App/Info.plist`. No se pudo
+detectar esto antes de correr en CI porque `xcodegen` no corre en Windows —
+es exactamente el tipo de fricción esperada al no tener Mac local, y quedó
+resuelto en una sola iteración. Ver
+[docs/decisions.md](decisions.md) para el detalle completo.

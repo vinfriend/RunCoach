@@ -10,27 +10,21 @@
 **Fase 1** (arquitectura/investigación) — **completada**.
 **Fase 2** (RunCoachCore: modelos, métricas, `RunState`) — **completada**.
 **Fase 3** (Simulation Engine) — **completada**.
-**Fase 4** (Proyecto iOS + CI macOS) — **casi completa**: repo en GitHub y
-Codemagic ya conectados. Falta únicamente confirmar el resultado del primer
-build real en CI (disparado por este mismo commit) y corregir lo que haga
-falta — es la primera vez que `project.yml`/`codemagic.yaml` se ejecutan de
-verdad, sin Mac local para haberlos probado antes.
+**Fase 4** (Proyecto iOS + CI macOS) — **completada**. Primer build real
+en Codemagic (`runcoach-ios-unsigned-build`, commit `dfa3980`) terminó en
+verde: `Status: finished`, todos los pasos OK, sin ningún paso en rojo
+(build de 1m 12s). El proyecto compila en CI sin depender de una Mac
+local — objetivo central de esta fase, cumplido.
 
 ## Último commit estable
 
 Ver `git log --oneline -1` para el hash exacto. Incluye Fase 0 a Fase 4
-(la parte de Fase 4 que no requiere GitHub/Codemagic).
+completas.
 
 ## Bloqueos
 
-- ~~Repo en GitHub~~ — **resuelto**: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/RunCoach).
-- ~~Cuenta de Codemagic~~ — **resuelto**: Vicente conectó Codemagic al repo.
-- **`codemagic.yaml` sin validar en CI**: como no hay Mac local, este
-  archivo no se pudo ejecutar ni probar antes de escribirlo. Este commit
-  dispara el primer build real (evento `push` a `main`). Pendiente de que
-  Vicente reporte el resultado desde el dashboard de Codemagic — no tengo
-  forma de verlo yo mismo. Si falla al primer intento, es información
-  nueva a corregir, no necesariamente un error de diseño.
+Ninguno activo. Los dos de Fase 4 (repo en GitHub, cuenta de Codemagic)
+quedaron resueltos por Vicente.
 
 ## Entorno Windows
 
@@ -56,11 +50,13 @@ puede testear en Windows (ver [docs/windows-development.md](docs/windows-develop
 
 ## Build iOS
 
-**Preparado, sin ejecutar todavía.** Existe:
+**Validado en CI real (Codemagic).** Existe:
 
 - `RunCoach-iOS/project.yml` (XcodeGen): target `RunCoach`, dependencia
   local a `RunCoachCore`, `deploymentTarget: 16.0`, permisos de ubicación/
   Bluetooth/background modes declarados (placeholders para Fases 6-9).
+  `info.path: App/Info.plist` — XcodeGen genera el Info.plist ahí (ver bug
+  corregido abajo).
 - `RunCoach-iOS/App/RunCoachApp.swift` + `ContentView.swift`: skeleton
   mínimo de SwiftUI que instancia un `RunState()` de `RunCoachCore` — solo
   para probar la integración del paquete, no es la UI real (Fase 5).
@@ -71,9 +67,12 @@ puede testear en Windows (ver [docs/windows-development.md](docs/windows-develop
   firma (`CODE_SIGNING_ALLOWED=NO`). Sin publishing (no hay Apple Developer
   account, eso es Fase 12).
 
-**Nada de esto se pudo validar realmente** porque no hay Mac local ni
-Codemagic conectado — la primera corrida real de CI queda pendiente de que
-Vicente complete las acciones de "Bloqueos".
+**Bug real encontrado y corregido en el primer intento**: el build #1
+falló en `xcodegen generate` con `Decoding failed at "path": Nothing
+found` — `info.properties` sin `info.path` no es válido para XcodeGen (el
+`path` del Plist es obligatorio aunque el archivo no exista todavía). Fix
+de una línea (commit `dfa3980`), build #2 pasó limpio. Detalle en
+[docs/decisions.md](docs/decisions.md).
 
 ## Decisiones tomadas
 
@@ -109,9 +108,9 @@ Sin compras realizadas.
 ## Riesgos identificados
 
 Ver tabla completa en [docs/architecture.md](docs/architecture.md#riesgos-identificados-fase-1).
-Nuevo en Fase 4: el `codemagic.yaml` no pudo probarse antes de escribirse
-(sin Mac local) — es esperable necesitar 1-2 iteraciones una vez que corra
-en CI de verdad.
+Confirmado en Fase 4: `project.yml`/`codemagic.yaml` sí necesitaron una
+iteración de fix una vez corridos en CI de verdad (esperable, sin Mac local
+para probarlos antes) — mitigado, no bloqueante.
 
 ## Archivos creados (nuevos en Fase 4)
 
@@ -132,12 +131,10 @@ falta.)
 
 Repo local con commits de Fase 0/1, Fase 2, Fase 3 y Fase 4, **pusheado a
 GitHub**: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/RunCoach)
-(`main`, en sync con `origin/main`).
+(`main`, en sync con `origin/main`). Codemagic conectado y con build verde.
 
 ## Próxima tarea
 
-Esperando que Vicente reporte el resultado del primer build de Codemagic
-(`runcoach-ios-unsigned-build`, disparado por el push de este commit). Si
-falla, corregir `project.yml`/`codemagic.yaml` según el log real. Si pasa,
-Fase 4 queda completa y ahí sí espero el "Continuar con Fase 5" antes de
-tocar la UI real de SwiftUI.
+Esperar confirmación explícita de Vicente ("Continuar con Fase 5") antes de
+empezar la UI real de SwiftUI (pantalla de carrera, configuración,
+historial) sobre el skeleton actual.
