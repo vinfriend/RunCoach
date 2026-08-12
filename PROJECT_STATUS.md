@@ -19,12 +19,13 @@
 - **8**: `RunSessionViewModel` soporta modo real (BLE+GPS con `Date` de
   referencia compartido) además del simulado; `RunView` deja elegir.
 
-**Fase 9** (Audio Coach) — **implementada, pendiente de confirmar build
-de CI**. `AudioCoach` (`AVSpeechSynthesizer`, voz `es-AR`) es pura
-infraestructura de voz — sin ninguna lógica de decisión. Anuncia eventos
-mecánicos que `RunCoachCore` ya calcula: inicio/fin de carrera, cada
-split completado con su ritmo. El Coach Decision Engine (cuándo/qué vale
-la pena decir) sigue siendo Fase 10, no implementado.
+**Fase 9** (Audio Coach) — **completada** (en el sentido de "compila").
+Build de Codemagic para el commit `4477ba1` terminó `finished` sin pasos
+fallidos (1m 5s). `AudioCoach` (`AVSpeechSynthesizer`, voz `es-AR`) es
+pura infraestructura de voz — sin ninguna lógica de decisión. Anuncia
+eventos mecánicos que `RunCoachCore` ya calcula: inicio/fin de carrera,
+cada split completado con su ritmo. El Coach Decision Engine (cuándo/qué
+vale la pena decir) sigue siendo Fase 10, no implementado.
 
 Nota de proceso (desde Fase 5): el trigger automático por `push` de
 Codemagic no dispara solo — hay que iniciar el build a mano desde el
@@ -61,10 +62,9 @@ lo de Fases 4-9 vive en `RunCoach-iOS` (no testeable en Windows).
 
 ## Build iOS
 
-**Fases 4 a 8 validadas en CI real** (builds verdes). **Fase 9: pendiente
-de confirmar** — ver "Próxima tarea". Recordatorio permanente: un build
-verde solo confirma que compila, no que funcione (ni siquiera que se
-escuche) con hardware real.
+**Fases 4 a 9 validadas en CI real** (todos los builds verdes).
+Recordatorio permanente: un build verde solo confirma que compila, no que
+funcione (ni siquiera que se escuche) con hardware real.
 
 ### Qué se agregó en Fase 9
 
@@ -153,10 +153,8 @@ Repo en GitHub: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/Run
 
 ## Próxima tarea
 
-Confirmar con Vicente el build de Codemagic para el commit de Fase 9 (hay
-que iniciarlo a mano). Si pasa, Fase 9 queda completa en el sentido de
-"compila". Después, esperar "Continuar con Fase 10" (Coach Decision
-Engine) de Vicente — la pieza central del proyecto: prioridades, cooldown,
-deduplicación, y la decisión de hablar o quedarse callado. Esta sí se
-puede testear de verdad en Windows (es lógica pura, va en RunCoachCore),
-a diferencia de las últimas cuatro fases.
+Esperar "Continuar con Fase 10" (Coach Decision Engine) de Vicente — la
+pieza central del proyecto: prioridades, cooldown, deduplicación, y la
+decisión de hablar o quedarse callado. Esta sí se puede testear de verdad
+en Windows (es lógica pura, va en RunCoachCore), a diferencia de las
+últimas cuatro fases.
