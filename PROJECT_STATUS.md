@@ -22,14 +22,15 @@
 - **9**: `AudioCoach` (voz `es-AR`) anuncia eventos mecánicos —
   inicio/fin de carrera, cada split. Sin lógica de decisión todavía.
 
-**Fase 10** (Coach Decision Engine) — **implementada, pendiente de
-confirmar build de CI de RunCoach-iOS**. La pieza central del proyecto, y
-la primera de las últimas cinco en vivir enteramente en `RunCoachCore` —
-**totalmente testeable en Windows**: 59 tests en verde (11 nuevos).
-`CoachDecisionEngine` decide `.silence`/`.speak(event)` combinando
-deduplicación, cooldown, y contexto reciente. Validado contra el
-escenario completo de 20 minutos: pocas intervenciones, no una por
-muestra. Ya wireado a `AudioCoach` en `RunSessionViewModel`.
+**Fase 10** (Coach Decision Engine) — **completada**. Build de Codemagic
+para el commit `9b61391` terminó `finished` sin pasos fallidos (1m 26s).
+La pieza central del proyecto, y la primera de las últimas cinco en vivir
+enteramente en `RunCoachCore` — **totalmente testeable en Windows**: 59
+tests en verde (11 nuevos). `CoachDecisionEngine` decide
+`.silence`/`.speak(event)` combinando deduplicación, cooldown, y contexto
+reciente. Validado contra el escenario completo de 20 minutos: pocas
+intervenciones, no una por muestra. Ya wireado a `AudioCoach` en
+`RunSessionViewModel`.
 
 **Bug real encontrado y corregido durante esta fase** (ver "Decisiones
 tomadas" #17): la deduplicación comparaba eventos por igualdad estricta
@@ -78,10 +79,7 @@ Detalle completo en [docs/windows-development.md](docs/windows-development.md).
 
 ## Build iOS
 
-**Fases 4 a 9 validadas en CI real** (builds verdes). **Fase 10:
-pendiente de confirmar** — ver "Próxima tarea" (solo la parte
-`RunCoach-iOS`; `RunCoachCore` ya está confirmado por los 59 tests de
-arriba).
+**Fases 4 a 10 validadas en CI real** (todos los builds verdes).
 
 ### Qué se agregó en Fase 10
 
@@ -189,8 +187,6 @@ Repo en GitHub: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/Run
 
 ## Próxima tarea
 
-Confirmar con Vicente el build de Codemagic para el commit de Fase 10
-(hay que iniciarlo a mano). Si pasa, Fase 10 queda completa. Después,
-esperar "Continuar con Fase 11" (OpenAI) de Vicente — la primera fase que
+Esperar "Continuar con Fase 11" (OpenAI) de Vicente — la primera fase que
 va a requerir que Vicente cree una cuenta/API key de OpenAI (con
 autorización explícita, nunca guardada en Git).
