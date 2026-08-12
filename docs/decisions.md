@@ -318,3 +318,42 @@ en la misma línea de tiempo.
 **Sin validar con hardware real** — como el resto de Fases 6-8, esto es
 una corrección de diseño razonada a partir de cómo funcionan las APIs
 documentadas, no confirmada empíricamente.
+
+---
+
+## 2026-08-11 — Fase 9: anuncios mecánicos, no Coach Decision Engine
+
+**Decisión**: `AudioCoach` (Fase 9) es pura infraestructura de voz —
+recibe un `String` y lo dice, sin ninguna lógica propia. Las llamadas a
+`speak(_:)` desde `RunSessionViewModel` están atadas a eventos mecánicos y
+deterministas que `RunCoachCore` ya calcula: inicio de carrera, fin de
+carrera, cada split completado (con su ritmo). No hay prioridades,
+cooldown, deduplicación, ni ningún juicio sobre "¿esto vale la pena
+decirlo ahora?".
+
+**Motivo**: el roadmap separa explícitamente Fase 9 ("Audio Coach" — que
+la app pueda hablar) de Fase 10 ("Coach Decision Engine" — cuándo y qué
+debería decir). Meter lógica de decisión acá hubiera mezclado dos
+responsabilidades distintas antes de tiempo. El requisito del prompt
+original también es explícito: "Primero quiero que el coach me hable" —
+sin exigir que sea inteligente todavía.
+
+**Impacto**: los anuncios actuales (split completado, inicio/fin) son
+deliberadamente simples y van a seguir sonando incluso después de que
+exista el Coach Decision Engine — la diferencia es que Fase 10 va a
+agregar anuncios *adicionales* basados en tendencias/eventos, con su
+propia lógica de cuándo callarse.
+
+**Voz en español (`es-AR`)**: coherente con que todo el proyecto y la
+documentación están en español y el usuario es de Argentina. Configurable
+vía el parámetro `languageCode` de `AudioCoach.init` si hace falta
+cambiarlo más adelante.
+
+**`AVAudioSession` con `.duckOthers`**: para que el coach pueda hablar
+sobre música/podcast sin cortarlo del todo — baja el volumen mientras
+habla y lo restaura después, comportamiento estándar de apps de fitness
+con voz.
+
+**Sin validar con audio real** — a diferencia de BLE, el simulador de iOS
+sí reproduce audio, así que en teoría esto se podría escuchar sin
+hardware — pero seguimos sin Mac para abrir Xcode y probarlo.

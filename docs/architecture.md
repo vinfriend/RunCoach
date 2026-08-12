@@ -146,9 +146,25 @@ real (Fase 14) ni de verlo correr en simulador (BLE no anda ahí). El
 "motor" está completo; que ande de verdad es otra historia, pendiente de
 Fase 14.
 
+**Implementado (Fase 9 — Audio Coach):**
+
+`AudioCoach` (`App/Audio/`) envuelve `AVSpeechSynthesizer` con voz en
+español (`es-AR` por defecto) y una `AVAudioSession` configurada como
+`.playback` + `.spokenAudio` con `.duckOthers` — pensada para sonar aunque
+el iPhone esté en silencio, bajando (no cortando) otro audio que esté
+sonando. **Es solo infraestructura de voz: no decide nada.**
+`RunSessionViewModel` la usa para anunciar eventos mecánicos que
+`RunCoachCore` ya calcula — inicio/fin de carrera, cada split completado
+con su ritmo — sin ninguna lógica de "¿vale la pena hablar ahora?". Esa
+decisión (prioridades, cooldown, deduplicación) es el Coach Decision
+Engine, Fase 10, todavía no implementado.
+
+A diferencia de BLE, el simulador de iOS sí reproduce audio — pero sin Mac
+para abrir Xcode, sigue sin poder escucharse ni validarse de este lado.
+
 Como no hay Mac local, todo este código solo se valida por CI (compila
-para simulador) — nunca se vio corriendo. Ver PROJECT_STATUS.md para el
-resultado real del build.
+para simulador) — nunca se vio corriendo, ni se escuchó sonar. Ver
+PROJECT_STATUS.md para el resultado real del build.
 
 ## HeartRateSource: independencia de marca
 

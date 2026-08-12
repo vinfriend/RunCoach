@@ -6,7 +6,7 @@
 
 ## Fase actual
 
-**Fases 0 a 7** — **completadas**. Resumen rápido:
+**Fases 0 a 8** — **completadas**. Resumen rápido:
 
 - **0-1**: entorno Windows listo, arquitectura e investigación.
 - **2-3**: `RunCoachCore` (modelos, métricas, `RunState`, Simulation
@@ -16,16 +16,15 @@
 - **6-7**: `BLEHeartRateSource` (CoreBluetooth) y `GPSLocationSource`
   (CoreLocation) — validados solo por compilación en CI, sin hardware
   real todavía.
+- **8**: `RunSessionViewModel` soporta modo real (BLE+GPS con `Date` de
+  referencia compartido) además del simulado; `RunView` deja elegir.
 
-**Fase 8** (Run Data Engine completo) — **completada** (en el sentido de
-"compila"). Build de Codemagic para el commit `92a5c74` terminó `finished`
-sin pasos fallidos (1m 5s). `RunSessionViewModel` ahora soporta modo real
-(`.real`) además del simulado: crea `BLEHeartRateSource` +
-`GPSLocationSource` con el **mismo** `Date` de referencia (resolviendo la
-nota pendiente de Fase 6) y alimenta el mismo `RunState`. `RunView` deja
-elegir el modo desde la pantalla inicial. El modo real sigue sin poder
-probarse funcionalmente — mismo motivo que Fases 6-7 (sin hardware, sin
-Mac).
+**Fase 9** (Audio Coach) — **implementada, pendiente de confirmar build
+de CI**. `AudioCoach` (`AVSpeechSynthesizer`, voz `es-AR`) es pura
+infraestructura de voz — sin ninguna lógica de decisión. Anuncia eventos
+mecánicos que `RunCoachCore` ya calcula: inicio/fin de carrera, cada
+split completado con su ritmo. El Coach Decision Engine (cuándo/qué vale
+la pena decir) sigue siendo Fase 10, no implementado.
 
 Nota de proceso (desde Fase 5): el trigger automático por `push` de
 Codemagic no dispara solo — hay que iniciar el build a mano desde el
@@ -57,40 +56,38 @@ Detalle completo en [docs/windows-development.md](docs/windows-development.md).
 
 ## Tests en Windows
 
-**48 tests, 0 fallas**, en `RunCoachCore`. Sin cambios en Fase 8 — todo lo
-nuevo vive en `RunCoach-iOS` (no testeable en Windows).
+**48 tests, 0 fallas**, en `RunCoachCore`. Sin cambios desde Fase 3 — todo
+lo de Fases 4-9 vive en `RunCoach-iOS` (no testeable en Windows).
 
 ## Build iOS
 
-**Fases 4 a 8 validadas en CI real** (todos los builds verdes).
-Recordatorio permanente: un build verde solo confirma que compila, no que
-funcione con hardware real.
+**Fases 4 a 8 validadas en CI real** (builds verdes). **Fase 9: pendiente
+de confirmar** — ver "Próxima tarea". Recordatorio permanente: un build
+verde solo confirma que compila, no que funcione (ni siquiera que se
+escuche) con hardware real.
 
-### Qué se agregó en Fase 8
+### Qué se agregó en Fase 9
 
-- `BLEHeartRateSource`/`GPSLocationSource`: `referenceStartDate` pasa de
-  auto-asignarse en `start()` a ser una propiedad pública settable (con
-  `Date()` como default). `isRunning` (bool interno) reemplaza el viejo
-  patrón de usar `referenceStartDate != nil` como flag.
-- `RunSessionViewModel`: nuevo enum `RunMode` (`.simulated`/`.real`).
-  `startSimulated()` es el flujo de Fase 5 sin cambios de fondo.
-  `startReal()` es nuevo: crea ambas fuentes reales, les fija un único
-  `Date` de referencia compartido, y las conecta al mismo `RunState`.
-  También se corrigió que `runState` no se reseteaba entre corridas
-  (ahora cada `start*()` crea uno nuevo).
-- `RunView`: la pantalla inicial ahora ofrece dos botones ("Simulación" /
-  "Sensores reales"), con textos honestos sobre qué esperar de cada uno.
-  Envuelta en `ScrollView` porque ahora tiene más contenido.
+- `RunCoach-iOS/App/Audio/AudioCoach.swift`: envuelve
+  `AVSpeechSynthesizer` con voz `es-AR`, `AVAudioSession` en
+  `.playback`/`.spokenAudio`/`.duckOthers` (suena con el iPhone en
+  silencio, baja otro audio en vez de cortarlo). Método único relevante:
+  `speak(_ text: String)` — no decide nada, solo dice lo que le pasan.
+- `RunSessionViewModel`: ahora anuncia por voz el inicio de carrera
+  (simulada o real), el fin de la carrera simulada, la detención manual, y
+  cada split completado con su ritmo (ej. "Kilómetro 2. Ritmo: 5 minutos
+  30 por kilómetro.").
 
-### Qué NO se hizo en Fase 8 (a propósito)
+### Qué NO se hizo en Fase 9 (a propósito)
 
-- Nada de audio/voz (Fase 9) ni Coach Decision Engine (Fase 10) — el modo
-  real solo muestra métricas numéricas, igual que el simulado.
-- Nada de manejo de errores hacia el usuario (sensor no encontrado, GPS
-  denegado) más allá de "no se muestran datos" — se afina con datos
-  reales en fases posteriores.
-- Nada de autorización "Always" ni verificación de background real — Fase
-  15, sin cambios respecto a Fase 7.
+- **Nada de lógica de decisión** — sin prioridades, cooldown,
+  deduplicación, ni juicio sobre si vale la pena hablar. Eso es
+  explícitamente el Coach Decision Engine, Fase 10.
+- Sin manejo de interrupciones de audio (llamadas telefónicas, otra app
+  tomando la sesión) — se afina con un iPhone real (Fase 13+).
+- Sin voz conversacional ni Realtime API — el prompt original es
+  explícito: "no introducir voz conversacional completa... primero quiero
+  que el coach me hable, no necesito hablarle durante una carrera."
 
 ## Decisiones tomadas
 
@@ -117,15 +114,17 @@ Ver [docs/decisions.md](docs/decisions.md) para el detalle y motivos:
 14. `GPSLocationSource` solo pide autorización "When In Use" — "Always" y
     la validación de background real quedan para Fase 15.
 15. `referenceStartDate` de `BLEHeartRateSource`/`GPSLocationSource` es
-    inyectable (no auto-asignado), para que `RunSessionViewModel` pueda
-    compartir un único punto de referencia temporal entre ambas fuentes.
+    inyectable (no auto-asignado), compartido entre ambas fuentes.
+16. `AudioCoach` es infraestructura pura, sin lógica de decisión — los
+    anuncios de Fase 9 están atados a eventos mecánicos de RunCoachCore,
+    no a juicios sobre qué vale la pena decir (eso es Fase 10).
 
 ## Arquitectura
 
-Resumen en [docs/architecture.md](docs/architecture.md). Fase 8 completa
-el patrón previsto desde el principio: `RunState` no distingue si lo
-alimenta una fuente simulada o real — ambas implementan los mismos
-protocolos (`HeartRateSource`/`LocationSource`) definidos en Fase 2.
+Resumen en [docs/architecture.md](docs/architecture.md). Con Fase 9, las
+tres piezas del lado Apple (BLE, GPS, Audio) ya existen; falta la que las
+conecta con inteligencia real (Coach Decision Engine, Fase 10) y la que
+las conecta con IA externa (OpenAI, Fase 11).
 
 ## Hardware
 
@@ -135,17 +134,16 @@ Sin compras realizadas.
 ## Riesgos identificados
 
 Ver tabla completa en [docs/architecture.md](docs/architecture.md#riesgos-identificados-fase-1).
-Sin cambios de fondo respecto a Fases 6-7: el modo real de
-`RunSessionViewModel` hereda el mismo riesgo de "código nunca antes
-corrido" de sus dos fuentes.
+`AudioCoach` es, a diferencia de BLE, algo que en teoría el simulador de
+iOS podría reproducir (tiene salida de audio) — pero sin Mac para abrir
+Xcode, el riesgo práctico de "código nunca antes escuchado" es el mismo
+que en Fases 6-8.
 
-## Archivos creados/modificados (Fase 8)
+## Archivos creados/modificados (Fase 9)
 
 ```
-RunCoach-iOS/App/BLE/BLEHeartRateSource.swift        (modificado)
-RunCoach-iOS/App/GPS/GPSLocationSource.swift          (modificado)
+RunCoach-iOS/App/Audio/AudioCoach.swift               (nuevo)
 RunCoach-iOS/App/ViewModels/RunSessionViewModel.swift (modificado)
-RunCoach-iOS/App/Views/RunView.swift                  (modificado)
 ```
 
 ## Git
@@ -155,6 +153,10 @@ Repo en GitHub: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/Run
 
 ## Próxima tarea
 
-Esperar "Continuar con Fase 9" (Audio Coach) de Vicente — ahí entra
-`AVSpeechSynthesizer` para que la app empiece a hablar, aunque todavía sin
-nada inteligente que decir (eso es Fase 10, el Coach Decision Engine).
+Confirmar con Vicente el build de Codemagic para el commit de Fase 9 (hay
+que iniciarlo a mano). Si pasa, Fase 9 queda completa en el sentido de
+"compila". Después, esperar "Continuar con Fase 10" (Coach Decision
+Engine) de Vicente — la pieza central del proyecto: prioridades, cooldown,
+deduplicación, y la decisión de hablar o quedarse callado. Esta sí se
+puede testear de verdad en Windows (es lógica pura, va en RunCoachCore),
+a diferencia de las últimas cuatro fases.

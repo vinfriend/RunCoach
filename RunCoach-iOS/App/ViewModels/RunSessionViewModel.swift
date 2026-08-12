@@ -25,8 +25,13 @@ enum RunMode: Equatable {
 /// de arrancarlos — así los timestamps de FC y GPS quedan comparables
 /// entre sí, resolviendo la nota pendiente de la Fase 6 (ver
 /// docs/decisions.md) — y alimenta el mismo `RunState` con lo que vayan
-/// entregando. Sin conectar a nada más (audio, Coach Decision Engine):
-/// eso son las Fases 9-10.
+/// entregando.
+///
+/// **Audio (Fase 9)**: anuncia inicio/fin de carrera y cada split
+/// completado por `AudioCoach`. Son anuncios mecánicos atados a eventos
+/// concretos que `RunCoachCore` ya calcula — no hay ninguna decisión de
+/// "¿vale la pena hablar ahora?". Eso es el Coach Decision Engine, Fase
+/// 10, todavía sin implementar.
 final class RunSessionViewModel: ObservableObject {
     @Published private(set) var isRunning = false
     @Published private(set) var mode: RunMode?
@@ -45,6 +50,7 @@ final class RunSessionViewModel: ObservableObject {
 
     private var runState = RunState()
     private var pendingWorkItems: [DispatchWorkItem] = []
+    private let audioCoach = AudioCoach()
 
     // Modo real
     private var heartRateSource: BLEHeartRateSource?
@@ -61,6 +67,7 @@ final class RunSessionViewModel: ObservableObject {
         mode = .simulated
         isRunning = true
         runState = RunState()
+        audioCoach.speak("Carrera simulada iniciada.")
 
         let heartRateSamples = ScenarioSimulator.generateHeartRateSamples(for: scenario)
         let locationSamples = ScenarioSimulator.generateLocationSamples(
@@ -83,6 +90,7 @@ final class RunSessionViewModel: ObservableObject {
         mode = .real
         isRunning = true
         runState = RunState()
+        audioCoach.speak("Carrera iniciada.")
 
         // Mismo Date de referencia para ambas fuentes — ver el comentario
         // de la clase y docs/decisions.md (nota pendiente desde Fase 6).
@@ -112,6 +120,8 @@ final class RunSessionViewModel: ObservableObject {
     // MARK: - Común
 
     func stop() {
+        let wasRunning = isRunning
+
         pendingWorkItems.forEach { $0.cancel() }
         pendingWorkItems.removeAll()
 
@@ -122,6 +132,10 @@ final class RunSessionViewModel: ObservableObject {
 
         isRunning = false
         mode = nil
+
+        if wasRunning {
+            audioCoach.speak("Carrera detenida.")
+        }
     }
 
     private func scheduleHeartRateSamples(_ samples: [HeartRateSample]) {
@@ -150,7 +164,9 @@ final class RunSessionViewModel: ObservableObject {
 
     private func scheduleEnd(after delay: TimeInterval) {
         let item = DispatchWorkItem { [weak self] in
-            self?.isRunning = false
+            guard let self else { return }
+            self.isRunning = false
+            self.audioCoach.speak("Carrera simulada finalizada.")
         }
         pendingWorkItems.append(item)
         // Un pequeño margen extra para que la última muestra ya se haya
@@ -159,11 +175,32 @@ final class RunSessionViewModel: ObservableObject {
     }
 
     private func refresh() {
+        let previousSplitCount = splits.count
+
         elapsedSeconds = runState.elapsedSeconds
         totalDistanceMeters = runState.totalDistanceMeters
         currentPaceSecondsPerKm = runState.currentPaceSecondsPerKm
         smoothedHeartRateBPM = runState.smoothedHeartRateBPM
         heartRateTrend = runState.heartRateTrend
         splits = runState.splits
+
+        if splits.count > previousSplitCount, let latestSplit = splits.last {
+            announceSplit(latestSplit)
+        }
+    }
+
+    /// Anuncio mecánico de un split recién completado — no es una
+    /// decisión del coach, es simplemente leer en voz alta un dato que
+    /// `RunState` ya calculó. Ver la nota de la clase sobre por qué esto
+    /// no es el Coach Decision Engine.
+    private func announceSplit(_ split: Split) {
+        let km = split.index + 1
+        audioCoach.speak("Kilómetro \(km). Ritmo: \(spokenPace(split.averagePaceSecondsPerKm)).")
+    }
+
+    private func spokenPace(_ secondsPerKm: Double?) -> String {
+        guard let secondsPerKm, secondsPerKm.isFinite else { return "sin datos" }
+        let totalSeconds = Int(secondsPerKm.rounded())
+        return "\(totalSeconds / 60) minutos \(totalSeconds % 60) por kilómetro"
     }
 }
