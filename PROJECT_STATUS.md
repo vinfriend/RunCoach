@@ -12,12 +12,13 @@
 **Fase 3** (Simulation Engine) — **completada**.
 **Fase 4** (Proyecto iOS + CI macOS) — **completada**.
 **Fase 5** (UI SwiftUI) — **completada**.
-**Fase 6** (BLE) — **implementada, pendiente de confirmar build de CI**.
-La parte de parsing (`HeartRateMeasurementParser`) sí está validada de
-verdad: 8 tests nuevos en verde en Windows. La parte de CoreBluetooth
-(`BLEHeartRateSource`) solo se puede validar por compilación — **ni
-siquiera el simulador de iOS sirve para probar BLE real**, así que esto
-queda funcionalmente sin verificar hasta tener hardware real (Fase 14).
+**Fase 6** (BLE) — **completada** (en el sentido de "compila"). Build de
+Codemagic para el commit `a7b6e40` terminó `finished` sin pasos fallidos
+(1m 9s). La parte de parsing (`HeartRateMeasurementParser`) está validada
+de verdad: 8 tests nuevos en verde en Windows. La parte de CoreBluetooth
+(`BLEHeartRateSource`) solo está validada por compilación — **ni siquiera
+el simulador de iOS sirve para probar BLE real**, así que sigue
+funcionalmente sin verificar hasta tener hardware real (Fase 14).
 
 Nota de proceso (desde Fase 5): el trigger automático por `push` de
 Codemagic no está disparando solo — hay que iniciar el build a mano desde
@@ -57,12 +58,11 @@ lograr esto.
 
 ## Build iOS
 
-**Fases 4 y 5 validadas en CI real** (builds verdes). **Fase 6 (BLE):
-pendiente de confirmar el build de CI para este commit** — ver "Próxima
-tarea". Incluso si el build pasa, eso solo confirma que `BLEHeartRateSource`
-compila contra las APIs de CoreBluetooth — no que funcione con un sensor
-real, algo que no se puede probar sin hardware (Fase 14) ni en el
-simulador de iOS (no tiene radio Bluetooth).
+**Fases 4, 5 y 6 validadas en CI real** (builds verdes). Para Fase 6 en
+particular: el build verde solo confirma que `BLEHeartRateSource` compila
+contra las APIs de CoreBluetooth — no que funcione con un sensor real,
+algo que no se puede probar sin hardware (Fase 14) ni en el simulador de
+iOS (no tiene radio Bluetooth).
 
 ### Qué se agregó en Fase 6
 
@@ -151,8 +151,8 @@ Repo en GitHub: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/Run
 
 ## Próxima tarea
 
-Confirmar con Vicente el resultado del build de Codemagic para el commit
-de Fase 6 (hay que iniciarlo a mano, ver nota de proceso arriba). Si pasa,
-Fase 6 queda "completa" en el sentido de "compila" — con la salvedad ya
-mencionada de que sigue sin validarse funcionalmente. Después, esperar
-"Continuar con Fase 7" (GPS) de Vicente.
+Esperar "Continuar con Fase 7" (GPS) de Vicente. Recordar que, igual que
+BLE, GPS real (`CoreLocation`) tampoco se va a poder probar de verdad sin
+un iPhone (el simulador de iOS sí puede simular ubicación, a diferencia de
+Bluetooth, así que Fase 7 debería ser algo más verificable que Fase 6 —
+a confirmar cuando se llegue ahí).
