@@ -24,6 +24,7 @@ targets:
     dependencies:
       - package: RunCoachCore
     info:
+      path: App/Info.plist
       properties:
         CFBundleDisplayName: RunCoach
         UILaunchScreen: {}

@@ -159,3 +159,27 @@ TestFlight se agrega recién en las Fases 12-13, cuando haya con qué firmar.
 
 **Alternativas consideradas**: ninguna — firmar sin certificados no es
 posible, así que no había otra opción real para Fase 4.
+
+---
+
+## 2026-08-11 — Fix: `info.path` es obligatorio en `project.yml`
+
+**Qué pasó**: el primer build real en Codemagic falló en el paso
+`xcodegen generate` con `Parsing project spec failed: Decoding failed at
+"path": Nothing found`. `project.yml` tenía `info.properties` sin
+`info.path` — asumí que XcodeGen podía generar el Info.plist "en memoria"
+sin necesidad de indicar dónde, pero el campo `path` es obligatorio para
+cualquier objeto Plist en el spec, aunque el archivo todavía no exista
+(XcodeGen lo crea ahí). No se pudo detectar este error antes porque
+`xcodegen` no corre en Windows — la primera vez que se pudo probar de
+verdad fue en el build de Codemagic.
+
+**Fix**: agregar `info.path: App/Info.plist` en
+[RunCoach-iOS/project.yml](../RunCoach-iOS/project.yml). XcodeGen genera el
+archivo ahí a partir de `properties` en el próximo `xcodegen generate`.
+
+**Impacto en el proceso**: confirma que hay una clase de errores de
+`project.yml`/`codemagic.yaml` que solo se detectan corriendo el build real
+en CI, no antes — al iterar sobre esto, esperar 1-2 vueltas más de este
+mismo patrón (fallo en CI → leer log → fix → commit → nuevo build) es
+normal, no señal de que el diseño esté mal.
