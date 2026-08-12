@@ -25,13 +25,11 @@ Ver `git log --oneline -1` para el hash exacto. Incluye Fase 0 a Fase 4
 
 ## Bloqueos
 
-- **Repo en GitHub**: no existe todavía. Necesita que Vicente cree el repo
-  y/o autorice `gh auth login` (OAuth) — no es algo que se pueda hacer sin
-  su intervención. Ver instrucciones exactas al final de este documento /
-  en la respuesta de esta sesión.
+- ~~Repo en GitHub~~ — **resuelto**: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/RunCoach),
+  `main` pusheado (commit `3368544` al momento de escribir esto).
 - **Cuenta de Codemagic**: no existe todavía. Necesita que Vicente se
-  registre (típicamente con "Sign in with GitHub", requiere el repo ya
-  creado) y autorice el acceso al repo.
+  registre (típicamente con "Sign in with GitHub", ya con el repo
+  disponible) y autorice el acceso al repo.
 - **`codemagic.yaml` sin validar en CI**: como no hay Mac local, este
   archivo no se pudo ejecutar ni probar antes de escribirlo — su primera
   ejecución real va a ser en Codemagic una vez conectado. Si falla al
@@ -136,18 +134,16 @@ falta.)
 
 ## Git
 
-Repo local con commits de Fase 0/1, Fase 2, Fase 3 y Fase 4. **Sin remoto
-en GitHub todavía** — es exactamente el bloqueo de esta fase.
+Repo local con commits de Fase 0/1, Fase 2, Fase 3 y Fase 4, **pusheado a
+GitHub**: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/RunCoach)
+(`main`, en sync con `origin/main`).
 
 ## Próxima tarea
 
-**Necesito una acción tuya para poder seguir con Fase 4** (crear el repo en
-GitHub y conectar Codemagic). Ver el mensaje de esta sesión para los pasos
-exactos. Una vez que:
-
-1. el repo esté en GitHub con este código pusheado, y
-2. Codemagic esté conectado a ese repo,
-
-le aviso para correr el primer build y corregir lo que haga falta. Recién
-ahí Fase 4 queda completa de verdad, y ahí sí espero tu "Continuar con Fase
-5" antes de tocar la UI real de SwiftUI.
+Falta conectar Codemagic al repo (acción de Vicente: crear cuenta / "Sign
+in with GitHub" en Codemagic y autorizar acceso al repo). Una vez conectado,
+correr el primer build (`runcoach-ios-unsigned-build`) y corregir lo que
+haga falta — es la primera vez que `project.yml`/`codemagic.yaml` se
+prueban de verdad, sin Mac local para validarlos antes. Recién ahí Fase 4
+queda completa, y ahí sí espero el "Continuar con Fase 5" antes de tocar la
+UI real de SwiftUI.
