@@ -20,8 +20,9 @@
 - **10**: `CoachDecisionEngine` — la pieza central, decide cuándo hablar
   (11 tests, incluyendo un bug real corregido — ver docs/decisions.md).
 
-**Fase 11** (OpenAI) — **implementada, pendiente de confirmar build de CI
-de RunCoach-iOS**. Mismo patrón que Fase 6 (BLE): la lógica de
+**Fase 11** (OpenAI) — **completada** (en el sentido de "compila"). Build
+de Codemagic para el commit `6dbdf57` terminó `finished` sin pasos
+fallidos (1m 6s). Mismo patrón que Fase 6 (BLE): la lógica de
 armado/parseo de requests vive en `RunCoachCore` (**73 tests en total, 14
 nuevos**), el cliente HTTP real (`URLSession`, timeout, retry) vive en
 `RunCoach-iOS`. Cuando `CoachDecisionEngine` decide `.speak`, se intenta
@@ -73,8 +74,7 @@ Detalle completo en [docs/windows-development.md](docs/windows-development.md).
 
 ## Build iOS
 
-**Fases 4 a 10 validadas en CI real** (builds verdes). **Fase 11:
-pendiente de confirmar** — ver "Próxima tarea".
+**Fases 4 a 11 validadas en CI real** (todos los builds verdes).
 
 ### Qué se agregó en Fase 11
 
@@ -195,12 +195,8 @@ Repo en GitHub: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/Run
 
 ## Próxima tarea
 
-Confirmar con Vicente el build de Codemagic para el commit de Fase 11
-(hay que iniciarlo a mano). Si pasa, Fase 11 queda completa en el sentido
-de "compila".
-
-Después, esperar "Continuar con Fase 12" (Apple Developer / firma) de
-Vicente. **Esa fase va a necesitar una acción de Vicente distinta a las
+Esperar "Continuar con Fase 12" (Apple Developer / firma) de Vicente.
+**Esa fase va a necesitar una acción de Vicente distinta a las
 anteriores**: crear/pagar una cuenta de Apple Developer Program — algo
 que nunca se hace de forma autónoma. También sería el momento natural
 para que Vicente cree la API key de OpenAI si quiere probarla (opcional,
