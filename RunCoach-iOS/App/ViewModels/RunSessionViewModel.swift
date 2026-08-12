@@ -270,6 +270,9 @@ final class RunSessionViewModel: ObservableObject {
             return "Tu esfuerzo está subiendo. Frecuencia cardíaca: \(Int(bpm.rounded())) por minuto."
         case .effortFalling(let bpm):
             return "Estás recuperando. Frecuencia cardíaca bajando a \(Int(bpm.rounded())) por minuto."
+        case .deteriorating(let bpm, let pace):
+            return "Ojo: tu frecuencia cardíaca sube y el ritmo está bajando. "
+                + "Frecuencia cardíaca: \(Int(bpm.rounded())) por minuto, ritmo: \(spokenPace(pace))."
         }
     }
 

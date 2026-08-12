@@ -3,7 +3,7 @@ import Foundation
 /// Media móvil simple sobre una ventana de tamaño fijo. Se usa para suavizar
 /// tanto la frecuencia cardíaca como el ritmo, evitando que un solo dato
 /// ruidoso dispare una reacción del Coach Decision Engine (Fase 10).
-public struct MovingAverage {
+public struct MovingAverage: Sendable {
     private var window: [Double] = []
     private let capacity: Int
 

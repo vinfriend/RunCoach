@@ -23,14 +23,13 @@ import Foundation
 /// cooldown lo permita, mientras la condición que lo generó siga vigente.
 /// Ver docs/decisions.md para el razonamiento completo.
 ///
-/// **Sobre "prioridades"**: el diseño (`CoachEvent` como enum,
-/// `CoachDecision` como resultado explícito) deja lugar para arbitrar
-/// entre eventos que compitan entre sí, pero hoy solo hay un detector
-/// (tendencia de FC) que nunca ofrece dos eventos distintos a la vez —
-/// no hay nada real que priorizar todavía. Esto se vuelve relevante
-/// cuando haya más de una fuente de eventos (más detectores, o
-/// recomendaciones de OpenAI en Fase 11) — documentado como limitación
-/// conocida, no implementado a ciegas.
+/// **Sobre "prioridades"**: el arbitraje entre eventos que compiten entre
+/// sí vive en `CoachEventDetector`, no acá — cuando la FC sube y el ritmo
+/// empeora al mismo tiempo, el detector devuelve `.deteriorating` en vez
+/// de `.effortRising`, aunque técnicamente las dos condiciones se
+/// cumplan. Este motor solo decide *cuándo* hablar de lo que el detector
+/// ya resolvió, no *cuál* de varios candidatos elegir — con un único
+/// detector activo, nunca hay más de un candidato por evaluación.
 public final class CoachDecisionEngine {
     /// Historial acotado de eventos efectivamente hablados, más reciente
     /// al final.

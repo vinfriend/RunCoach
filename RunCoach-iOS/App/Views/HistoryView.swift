@@ -38,7 +38,9 @@ struct HistoryView: View {
     private var list: some View {
         List {
             ForEach(viewModel.runs) { run in
-                runRow(run)
+                NavigationLink(destination: RunDetailView(run: run)) {
+                    runRow(run)
+                }
             }
             .onDelete { indexSet in
                 for index in indexSet {
@@ -60,9 +62,9 @@ struct HistoryView: View {
             }
 
             HStack(spacing: 8) {
-                Text(formattedDuration(run.durationSeconds))
+                Text(RunFormatting.duration(run.durationSeconds))
                 Text("·")
-                Text(formattedDistance(run.totalDistanceMeters))
+                Text(RunFormatting.distance(run.totalDistanceMeters))
                 if let averageHeartRateBPM = run.averageHeartRateBPM {
                     Text("·")
                     Text("\(Int(averageHeartRateBPM.rounded())) bpm prom.")
@@ -78,15 +80,6 @@ struct HistoryView: View {
             }
         }
         .padding(.vertical, 2)
-    }
-
-    private func formattedDuration(_ seconds: TimeInterval) -> String {
-        let totalSeconds = Int(seconds)
-        return String(format: "%02d:%02d", totalSeconds / 60, totalSeconds % 60)
-    }
-
-    private func formattedDistance(_ meters: Double) -> String {
-        String(format: "%.2f km", meters / 1000)
     }
 }
 

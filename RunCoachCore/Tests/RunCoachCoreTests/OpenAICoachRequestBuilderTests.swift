@@ -58,6 +58,16 @@ final class OpenAICoachRequestBuilderTests: XCTestCase {
         XCTAssertTrue(prompt.contains("165"))
     }
 
+    func testUserPromptDescribesDeterioration() {
+        let builder = OpenAICoachRequestBuilder()
+        let prompt = builder.userPrompt(for: makeSummary(
+            event: .deteriorating(currentBPM: 170, currentPaceSecondsPerKm: 360)
+        ))
+        XCTAssertTrue(prompt.contains("deterioro"))
+        XCTAssertTrue(prompt.contains("170"))
+        XCTAssertTrue(prompt.contains("6:00 por kilómetro"))
+    }
+
     func testUserPromptDescribesFallingEffort() {
         let builder = OpenAICoachRequestBuilder()
         let prompt = builder.userPrompt(for: makeSummary(event: .effortFalling(currentBPM: 140)))

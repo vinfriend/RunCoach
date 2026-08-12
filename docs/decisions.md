@@ -534,3 +534,71 @@ diferencia de `HeartRateSample`/`LocationSample` (Fase 2, relativos a
 propósito para determinismo), acá lo que importa es la fecha/hora real en
 que pasó la carrera — no hay ninguna razón para ocultar eso detrás de un
 offset relativo.
+
+---
+
+## 2026-08-12 — Post-Fase 19: `PaceTrend` y evento `deteriorating`, con arbitraje de prioridad en el detector
+
+**Decisión**: agregar `PaceTrend` (`Metrics/`), calcado de `HeartRateTrend`
+(mismo umbral configurable, misma forma de clasificar
+`improving`/`worsening`/`stable`), y un nuevo caso `CoachEvent.deteriorating`
+que dispara cuando `heartRateTrend == .rising` **y** `paceTrend ==
+.worsening` simultáneamente. `CoachEventDetector` chequea esta condición
+más específica *antes* del switch genérico de `effortRising`/
+`effortFalling` — la primera pieza real de arbitraje de prioridad entre
+candidatos del proyecto (antes no hacía falta, porque solo había un
+detector).
+
+**Motivo**: Vicente pidió explícitamente "Coach Decision Engine más
+completo" como una de las tres líneas de trabajo a seguir dentro de lo
+alcanzable sin cuenta de Apple ni hardware. El prompt original ya mencionaba
+"relación ritmo/FC" y "deterioro" como señales que el coach debería poder
+detectar, y hasta ahora solo existía la tendencia aislada de FC.
+
+**Por qué el arbitraje vive en `CoachEventDetector` y no en
+`CoachDecisionEngine`**: es consistente con la separación de Fase 10 (ver
+decisión de arriba) — el detector decide *qué* candidato es el más
+específico/relevante para el instante actual del `RunState`; el motor de
+decisión sigue sin saber nada de eventos concretos, solo de cooldown/
+deduplicación/contexto reciente sobre lo que el detector le entregue.
+
+**`RunState.trend<T>(from:classify:)`**: al escribir `paceTrend` como una
+copia casi textual de `heartRateTrend`, se extrajo la lógica compartida
+("buscar en el historial el valor de hace `trendLookbackSeconds` y
+clasificar contra el más reciente") a un helper genérico privado — evita
+mantener dos copias de la misma búsqueda binaria/lineal sobre el historial.
+
+**Alternativas consideradas**: un evento `deteriorating` separado con su
+propia prioridad explícita en `CoachDecisionEngine` (por ejemplo, un campo
+`severity` en `CoachEvent`) — descartado por ahora como sobre-ingeniería:
+con dos detectores nada más, un `if` antes del switch alcanza; se puede
+reconsiderar si se agregan más eventos que compitan entre sí de formas más
+complejas.
+
+---
+
+## 2026-08-12 — Post-Fase 19: `RunFormatting` compartido entre pantallas
+
+**Qué pasó**: durante una revisión de calidad pedida explícitamente por
+Vicente ("Revisión de calidad y refactor", sin nueva funcionalidad), se
+encontró que `RunView.formattedPace` truncaba el ritmo
+(`Int(secondsPerKm)`) mientras que la nueva `RunDetailView.formattedPace`
+lo redondeaba (`Int(secondsPerKm.rounded())`) — mismo formato visual,
+resultado levemente distinto según la pantalla para el mismo dato. Cada
+vista tenía además su propia copia de `formattedDuration`/
+`formattedDistance`, idénticas entre sí.
+
+**Fix**: se creó `RunFormatting` (`App/Formatting/`, enum sin estado) con
+`duration(_:)`, `distance(_:)`, `pace(_:whenMissing:)` — usado ahora por
+`RunView`, `HistoryView` y `RunDetailView`, con `.rounded()` como criterio
+único para el ritmo. Se eliminaron los métodos privados duplicados de las
+tres vistas.
+
+**Motivo**: exactamente el tipo de bug que una revisión de consistencia
+entre pantallas está pensada para encontrar — ninguno de los tests de
+`RunCoachCore` lo hubiera detectado, porque el formateo es lógica de
+presentación en `RunCoach-iOS`, fuera del alcance de esos tests.
+
+**Impacto**: sin funcionalidad nueva, como correspondía al alcance pedido
+— es un cambio puramente interno, mismo comportamiento visible salvo por
+la inconsistencia corregida.

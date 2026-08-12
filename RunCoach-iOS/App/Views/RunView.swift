@@ -81,13 +81,13 @@ struct RunView: View {
                     .textCase(.uppercase)
             }
 
-            Text(formattedElapsed)
+            Text(RunFormatting.duration(session.elapsedSeconds))
                 .font(.system(size: 48, weight: .bold, design: .rounded))
                 .monospacedDigit()
 
             HStack(spacing: 32) {
-                metricTile(title: "Distancia", value: formattedDistance)
-                metricTile(title: "Ritmo", value: formattedPace(session.currentPaceSecondsPerKm))
+                metricTile(title: "Distancia", value: RunFormatting.distance(session.totalDistanceMeters))
+                metricTile(title: "Ritmo", value: RunFormatting.pace(session.currentPaceSecondsPerKm, whenMissing: "—"))
             }
 
             HStack(spacing: 8) {
@@ -118,7 +118,7 @@ struct RunView: View {
                 HStack {
                     Text("Km \(split.index + 1)")
                     Spacer()
-                    Text(formattedPace(split.averagePaceSecondsPerKm))
+                    Text(RunFormatting.pace(split.averagePaceSecondsPerKm, whenMissing: "—"))
                 }
                 .font(.footnote)
             }
@@ -135,21 +135,6 @@ struct RunView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
-    }
-
-    private var formattedElapsed: String {
-        let totalSeconds = Int(session.elapsedSeconds)
-        return String(format: "%02d:%02d", totalSeconds / 60, totalSeconds % 60)
-    }
-
-    private var formattedDistance: String {
-        String(format: "%.2f km", session.totalDistanceMeters / 1000)
-    }
-
-    private func formattedPace(_ secondsPerKm: Double?) -> String {
-        guard let secondsPerKm, secondsPerKm.isFinite else { return "—" }
-        let totalSeconds = Int(secondsPerKm)
-        return String(format: "%d:%02d /km", totalSeconds / 60, totalSeconds % 60)
     }
 
     private var formattedHeartRate: String {

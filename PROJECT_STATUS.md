@@ -37,8 +37,9 @@ docs/decisions.md para el razonamiento completo de por qué el roadmap deja
 de ser estrictamente secuencial acá.
 
 - `CompletedRun`/`RunHistoryStore` (RunCoachCore): persistencia real a
-  disco vía `FileManager` — **93 tests en total, 10 nuevos**, incluyendo
-  E/S real con directorios temporales en Windows.
+  disco vía `FileManager` — **83 tests en total, 10 nuevos**, incluyendo
+  E/S real con directorios temporales en Windows. (El trabajo posterior a
+  Fase 19 sumó 10 tests más, llegando a los 93 actuales — ver más abajo.)
 - `HistoryView` ya no es un placeholder: lista real, con borrado, de
   carreras guardadas.
 - Cada carrera (simulada o real) que termina se guarda automáticamente.
@@ -46,6 +47,28 @@ de ser estrictamente secuencial acá.
 Nota de proceso (desde Fase 5): el trigger automático por `push` de
 Codemagic no dispara solo — hay que iniciar el build a mano desde el
 dashboard ("Start new build") cada vez.
+
+**Post-Fase 19 (sin número de fase — trabajo pedido dentro de lo
+alcanzable sin cuenta de Apple ni hardware)** — **completado**. Vicente
+eligió las tres líneas de trabajo ofrecidas: Coach Decision Engine más
+completo, vista de detalle de carrera, y revisión de calidad/refactor sin
+funcionalidad nueva. Ver docs/decisions.md para el detalle de diseño de
+cada una.
+
+- `PaceTrend` (RunCoachCore) + `CoachEvent.deteriorating` (FC subiendo y
+  ritmo empeorando a la vez) — primer caso real de arbitraje de prioridad
+  entre eventos candidatos, resuelto en `CoachEventDetector`. **93 tests
+  en total, 10 nuevos** (verificado con `swift test`).
+- `RunDetailView` (RunCoach-iOS): pantalla de detalle de una carrera
+  guardada, accesible desde `HistoryView`.
+- `RunFormatting` (RunCoach-iOS): formateo de duración/distancia/ritmo
+  centralizado — corrige una inconsistencia real encontrada en la
+  revisión (`RunView` truncaba el ritmo, `RunDetailView` lo redondeaba).
+- Revisión de calidad sobre todo `RunCoachCore`/`RunCoach-iOS`: sin
+  TODO/FIXME pendientes, `MovingAverage` ahora `Sendable` (consistencia
+  con el resto del módulo), force-unwraps existentes revisados y
+  confirmados seguros (`CBCentralManager!` idiomático,
+  `URL(string:)!` sobre literal constante).
 
 ## Último commit estable
 
@@ -90,6 +113,12 @@ Detalle completo en [docs/windows-development.md](docs/windows-development.md).
 - Fase 19 (10): `CompletedRunTests` (2), `RunHistoryStoreTests` (6) — save/
   load/delete/orden/resiliencia ante archivos corruptos —, más 2 nuevos en
   `RunStateTests` para `averageHeartRateBPM`.
+- Post-Fase 19 (10): `PaceTrendTests` (4, nuevo), 3 nuevos en
+  `RunStateTests` (`paceTrend`), 2 nuevos en `CoachEventDetectorTests`
+  (`.deteriorating`), 1 nuevo en `OpenAICoachRequestBuilderTests`.
+
+Total actual verificado con `swift test`: **93 tests, 0 fallas** (incluye
+todo lo de arriba).
 
 ## Build iOS
 
@@ -175,6 +204,12 @@ Ver [docs/decisions.md](docs/decisions.md) para el detalle y motivos:
 24. Historial persistido como archivos JSON (`FileManager`), no
     SwiftData/Core Data — portable, testeable en Windows, suficiente para
     el volumen de un proyecto personal.
+25. `PaceTrend` + `CoachEvent.deteriorating`, con el arbitraje de
+    prioridad resuelto en `CoachEventDetector` (no en
+    `CoachDecisionEngine`) — mismo patrón de separación que Fase 10.
+26. `RunFormatting` compartido entre `RunView`/`HistoryView`/
+    `RunDetailView` — corrige una inconsistencia real de formateo de
+    ritmo encontrada en la revisión de calidad post-Fase 19.
 
 ## Arquitectura
 
@@ -213,6 +248,27 @@ RunCoach-iOS/App/Views/HistoryView.swift                            (reescrito)
 RunCoach-iOS/App/ViewModels/RunSessionViewModel.swift                (modificado)
 ```
 
+## Archivos creados/modificados (post-Fase 19)
+
+```
+RunCoachCore/Sources/RunCoachCore/Metrics/PaceTrend.swift               (nuevo)
+RunCoachCore/Sources/RunCoachCore/Metrics/MovingAverage.swift           (modificado: + Sendable)
+RunCoachCore/Sources/RunCoachCore/RunState.swift                        (modificado: + paceTrend, trend<T> helper)
+RunCoachCore/Sources/RunCoachCore/Coach/CoachEvent.swift                (modificado: + .deteriorating)
+RunCoachCore/Sources/RunCoachCore/Coach/CoachEventDetector.swift        (modificado: arbitraje de prioridad)
+RunCoachCore/Sources/RunCoachCore/Coach/CoachDecisionEngine.swift       (doc comment actualizado)
+RunCoachCore/Sources/RunCoachCore/OpenAI/OpenAICoachRequestBuilder.swift (modificado: caso .deteriorating)
+RunCoachCore/Tests/RunCoachCoreTests/PaceTrendTests.swift               (nuevo)
+RunCoachCore/Tests/RunCoachCoreTests/RunStateTests.swift                (modificado)
+RunCoachCore/Tests/RunCoachCoreTests/CoachEventDetectorTests.swift      (modificado)
+RunCoachCore/Tests/RunCoachCoreTests/OpenAICoachRequestBuilderTests.swift (modificado)
+RunCoach-iOS/App/ViewModels/RunSessionViewModel.swift                   (modificado: frase de .deteriorating)
+RunCoach-iOS/App/Views/RunDetailView.swift                              (nuevo)
+RunCoach-iOS/App/Views/HistoryView.swift                                (modificado: NavigationLink a detalle)
+RunCoach-iOS/App/Views/RunView.swift                                    (modificado: usa RunFormatting)
+RunCoach-iOS/App/Formatting/RunFormatting.swift                         (nuevo)
+```
+
 ## Git
 
 Repo en GitHub: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/RunCoach),
@@ -220,10 +276,13 @@ Repo en GitHub: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/Run
 
 ## Próxima tarea
 
-No hay más fases avanzables sin firma/hardware según el roadmap original.
-Opciones para cuando Vicente quiera seguir:
+Con el trabajo post-Fase 19 (Coach Decision Engine ampliado, detalle de
+carrera, revisión de calidad) completado y commiteado, no hay más fases
+avanzables sin firma/hardware según el roadmap original. Opciones para
+cuando Vicente quiera seguir:
 
 1. Retomar Fase 12 (pagar Apple Developer) cuando decida.
 2. Pedir trabajo adicional dentro de lo ya alcanzable sin cuenta/hardware
-   (pulir UI, más tests, mejoras al Coach Decision Engine, etc.) — a
-   definir con Vicente, no asumir.
+   (pulir UI, más tests, más detectores del Coach Decision Engine —
+   desviación de objetivo, por ejemplo, etc.) — a definir con Vicente, no
+   asumir.

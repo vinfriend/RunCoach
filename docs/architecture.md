@@ -96,8 +96,9 @@ Windows.
 **Implementado (Fase 10 — Coach Decision Engine):**
 
 - **`CoachEvent`** (`Coach/`): los tipos de evento que el motor puede
-  detectar — hoy, `effortRising`/`effortFalling` (basados en
-  `RunState.heartRateTrend`). Sin texto ni idioma — eso lo genera
+  detectar — `effortRising`/`effortFalling` (basados en
+  `RunState.heartRateTrend`), y `deteriorating` (ver más abajo, trabajo
+  posterior a Fase 19). Sin texto ni idioma — eso lo genera
   `RunCoach-iOS`.
 - **`CoachEventDetector`**: función pura y sin memoria que clasifica el
   `RunState` actual en un `CoachEvent` candidato (o `nil`). Separado
@@ -113,10 +114,9 @@ Windows.
 - Validado contra el escenario de referencia completo de 20 minutos: la
   salida más frecuente es `.silence`, con como máximo 3 intervenciones en
   toda la carrera (criterio de [docs/testing.md](testing.md)).
-- **Sin implementar**: arbitraje de prioridades entre eventos que
-  compitan entre sí — hoy solo hay un detector (tendencia de FC), así que
-  nunca hay dos candidatos simultáneos que priorizar. Se vuelve relevante
-  con más detectores o con las recomendaciones de OpenAI (Fase 11).
+- **Arbitraje de prioridades**: implementado en `CoachEventDetector` (no
+  en `CoachDecisionEngine`) — ver la sección "Coach Decision Engine
+  ampliado" más abajo.
 
 **Implementado (Fase 11 — OpenAI):**
 
@@ -147,11 +147,35 @@ firma/hardware):**
 - `Split` ahora es `Codable` (antes solo `Equatable`/`Sendable`) —
   necesario para que `CompletedRun` se pueda serializar.
 
+**Implementado (post-Fase 19 — Coach Decision Engine ampliado):**
+
+Trabajo pedido por Vicente dentro de lo alcanzable sin cuenta de Apple ni
+hardware, no atado a un número de fase del roadmap original:
+
+- **`PaceTrend`** (`Metrics/`): mismo patrón que `HeartRateTrend` —
+  clasifica `improving`/`worsening`/`stable` comparando el ritmo suavizado
+  reciente contra el de hace `trendLookbackSeconds`, con umbral
+  configurable (10 s/km por defecto). `RunState` mantiene un historial
+  `paceSmoothedHistory` paralelo al de FC para poder calcularlo.
+- **`RunState.trend<T>(from:classify:)`**: helper genérico privado que
+  extrae la lógica común ("comparar el valor suavizado reciente contra el
+  de hace N segundos") compartida por `heartRateTrend` y `paceTrend` —
+  evita duplicar la misma búsqueda en el historial dos veces.
+- **`CoachEvent.deteriorating`**: nuevo caso — FC subiendo *y* ritmo
+  empeorando al mismo tiempo. `CoachEventDetector` lo chequea *antes* que
+  el switch genérico de `effortRising`/`effortFalling`, dando la primera
+  arbitraje de prioridad real del proyecto (antes no hacía falta: solo
+  había un detector). Documentado en detalle en
+  [docs/decisions.md](decisions.md).
+- Extendido también en `OpenAICoachRequestBuilder` (describe el deterioro
+  en el prompt a OpenAI) y en `RunSessionViewModel.spokenText(for:)`
+  (frase de fallback en español).
+
 **Pendiente (fases futuras):**
 
-- **Detección de eventos** más allá de la tendencia de FC: desviación de
-  objetivo, aceleraciones/anomalías puntuales (posible ampliación futura
-  de `CoachEventDetector`, no planificada todavía).
+- **Detección de eventos** más allá de FC/ritmo: desviación de objetivo,
+  aceleraciones/anomalías puntuales (posible ampliación futura de
+  `CoachEventDetector`, no planificada todavía).
 
 ### RunCoach-iOS (proyecto Xcode, generado con XcodeGen)
 
@@ -274,6 +298,20 @@ Igual que el resto de `RunCoach-iOS`, esto compila en CI pero nunca se vio
 corriendo — sin Mac no hay forma de confirmar que la lista se ve bien o
 que el borrado funciona de verdad, más allá de que la lógica de
 persistencia (RunCoachCore) sí está sólidamente testeada.
+
+**Implementado (post-Fase 19 — detalle de carrera y formateo compartido):**
+
+- **`RunDetailView`** (`App/Views/`): pantalla de detalle de un
+  `CompletedRun`, accesible desde `HistoryView` (`NavigationLink` en cada
+  fila) — resumen completo (fecha, hora, modo, duración, distancia, FC
+  promedio, ritmo promedio) y la lista completa de splits con ritmo/FC.
+- **`RunFormatting`** (`App/Formatting/`, nuevo): formateo de
+  duración/distancia/ritmo centralizado, usado por `RunView`,
+  `HistoryView` y `RunDetailView` — antes cada pantalla tenía su propia
+  copia de esta lógica, y una divergencia sutil (una truncaba el ritmo,
+  otra lo redondeaba) hacía que el mismo dato se viera distinto según la
+  pantalla. Encontrado y corregido durante la revisión de calidad
+  posterior a Fase 19 — ver [docs/decisions.md](decisions.md).
 
 ## HeartRateSource: independencia de marca
 

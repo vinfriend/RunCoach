@@ -4,7 +4,7 @@ import Foundation
 /// GPS a medida que llegan (desde una fuente real o simulada — a
 /// `RunState` no le importa cuál) y mantiene las métricas derivadas:
 /// distancia, tiempo transcurrido, ritmo suavizado, FC suavizada,
-/// tendencia de FC, y splits.
+/// tendencia de FC, tendencia de ritmo, y splits.
 ///
 /// Es una clase (no un struct) porque representa una única carrera en
 /// curso que se va mutando con cada muestra — no tiene sentido copiarla.
@@ -14,6 +14,7 @@ public final class RunState {
     private let paceWindowSize: Int
     private let trendLookbackSeconds: TimeInterval
     private let trendThresholdBPM: Double
+    private let paceTrendThresholdSecondsPerKm: Double
 
     public private(set) var heartRateSamples: [HeartRateSample] = []
     public private(set) var locationSamples: [LocationSample] = []
@@ -25,10 +26,12 @@ public final class RunState {
     private var heartRateMovingAverage: MovingAverage
     private var paceMovingAverage: MovingAverage
 
-    /// Snapshot de la FC suavizada en cada instante en que se ingiere una
-    /// muestra — permite calcular la tendencia comparando "ahora" contra
-    /// "hace N segundos" sin volver a recorrer todo el historial.
+    /// Snapshot del valor suavizado (FC o ritmo) en cada instante en que
+    /// se ingiere una muestra — permite calcular la tendencia comparando
+    /// "ahora" contra "hace N segundos" sin volver a recorrer todo el
+    /// historial. Mismo patrón para las dos métricas, ver `trend(from:...)`.
     private var heartRateSmoothedHistory: [(timestamp: TimeInterval, smoothed: Double)] = []
+    private var paceSmoothedHistory: [(timestamp: TimeInterval, smoothed: Double)] = []
 
     private var distanceAtLastSplit: Double = 0
     private var timeAtLastSplit: TimeInterval = 0
@@ -39,7 +42,8 @@ public final class RunState {
         heartRateWindowSize: Int = 10,
         paceWindowSize: Int = 5,
         trendLookbackSeconds: TimeInterval = 60,
-        trendThresholdBPM: Double = 3
+        trendThresholdBPM: Double = 3,
+        paceTrendThresholdSecondsPerKm: Double = 10
     ) {
         precondition(splitDistanceMeters > 0, "splitDistanceMeters debe ser mayor a 0")
         self.splitDistanceMeters = splitDistanceMeters
@@ -47,6 +51,7 @@ public final class RunState {
         self.paceWindowSize = paceWindowSize
         self.trendLookbackSeconds = trendLookbackSeconds
         self.trendThresholdBPM = trendThresholdBPM
+        self.paceTrendThresholdSecondsPerKm = paceTrendThresholdSecondsPerKm
         self.heartRateMovingAverage = MovingAverage(capacity: heartRateWindowSize)
         self.paceMovingAverage = MovingAverage(capacity: paceWindowSize)
     }
@@ -82,6 +87,9 @@ public final class RunState {
             if deltaTime > 0 && deltaDistance > 0 {
                 let paceSecondsPerKm = deltaTime / (deltaDistance / 1000)
                 paceMovingAverage.add(paceSecondsPerKm)
+                if let smoothed = paceMovingAverage.value {
+                    paceSmoothedHistory.append((timestamp: sample.timestamp, smoothed: smoothed))
+                }
             }
 
             checkForSplit()
@@ -112,20 +120,45 @@ public final class RunState {
     }
 
     public var heartRateTrend: HeartRateTrend {
-        guard let latest = heartRateSmoothedHistory.last else { return .stable }
+        trend(from: heartRateSmoothedHistory) { recent, previous in
+            HeartRateTrend.classify(recentAverage: recent, previousAverage: previous, thresholdBPM: trendThresholdBPM)
+        } ?? .stable
+    }
+
+    /// Hacia dónde viene el ritmo: `.improving` (más rápido),
+    /// `.worsening` (más lento) o `.stable`. Junto con `heartRateTrend`,
+    /// es lo que permite al Coach Decision Engine (`CoachEventDetector`)
+    /// distinguir "el esfuerzo sube porque estoy acelerando a propósito"
+    /// de "el esfuerzo sube y encima voy más lento" (deterioro real).
+    public var paceTrend: PaceTrend {
+        trend(from: paceSmoothedHistory) { recent, previous in
+            PaceTrend.classify(
+                recentAverage: recent,
+                previousAverage: previous,
+                thresholdSecondsPerKm: paceTrendThresholdSecondsPerKm
+            )
+        } ?? .stable
+    }
+
+    /// Compara el valor suavizado más reciente de `history` contra el que
+    /// había hace `trendLookbackSeconds`, y lo clasifica con `classify`.
+    /// `nil` si no hay historial suficiente (menos de `trendLookbackSeconds`
+    /// de datos todavía) — quien llama decide el valor "neutro" para ese
+    /// caso (`heartRateTrend`/`paceTrend` usan `.stable`).
+    private func trend<T>(
+        from history: [(timestamp: TimeInterval, smoothed: Double)],
+        classify: (_ recent: Double, _ previous: Double) -> T
+    ) -> T? {
+        guard let latest = history.last else { return nil }
 
         let targetTimestamp = latest.timestamp - trendLookbackSeconds
         // Buscamos la muestra más reciente que sea igual o anterior al
         // punto de comparación ("hace trendLookbackSeconds").
-        guard let reference = heartRateSmoothedHistory.last(where: { $0.timestamp <= targetTimestamp }) else {
-            return .stable
+        guard let reference = history.last(where: { $0.timestamp <= targetTimestamp }) else {
+            return nil
         }
 
-        return HeartRateTrend.classify(
-            recentAverage: latest.smoothed,
-            previousAverage: reference.smoothed,
-            thresholdBPM: trendThresholdBPM
-        )
+        return classify(latest.smoothed, reference.smoothed)
     }
 
     // MARK: - Splits

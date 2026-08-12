@@ -15,6 +15,18 @@ public enum CoachEventDetector {
     public static func detect(runState: RunState) -> CoachEvent? {
         guard let bpm = runState.smoothedHeartRateBPM else { return nil }
 
+        // Prioridad: si la FC sube Y el ritmo empeora al mismo tiempo, eso
+        // es más específico y accionable que "el esfuerzo está subiendo"
+        // solo (que también incluye el caso normal de acelerar a
+        // propósito) — ver CoachEvent.deteriorating. Es el primer caso
+        // real de arbitraje entre dos señales que compiten; antes de
+        // agregar paceTrend, no había nada que priorizar.
+        if runState.heartRateTrend == .rising,
+           runState.paceTrend == .worsening,
+           let pace = runState.currentPaceSecondsPerKm {
+            return .deteriorating(currentBPM: bpm, currentPaceSecondsPerKm: pace)
+        }
+
         switch runState.heartRateTrend {
         case .rising:
             return .effortRising(currentBPM: bpm)

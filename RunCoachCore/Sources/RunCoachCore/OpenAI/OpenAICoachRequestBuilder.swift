@@ -55,6 +55,10 @@ public struct OpenAICoachRequestBuilder: Sendable {
             eventDescription = "la frecuencia cardíaca viene subiendo de forma sostenida, ahora está en \(Int(bpm.rounded())) por minuto"
         case .effortFalling(let bpm):
             eventDescription = "la frecuencia cardíaca viene bajando de forma sostenida, ahora está en \(Int(bpm.rounded())) por minuto"
+        case .deteriorating(let bpm, let pace):
+            let paceMinutes = Int(pace) / 60
+            let paceSeconds = Int(pace) % 60
+            eventDescription = "hay señales de deterioro: la frecuencia cardíaca sube (\(Int(bpm.rounded())) por minuto) mientras el ritmo empeora (\(paceMinutes):\(String(format: "%02d", paceSeconds)) por kilómetro)"
         }
 
         let paceDescription: String

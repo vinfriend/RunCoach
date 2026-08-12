@@ -117,6 +117,56 @@ final class RunStateTests: XCTestCase {
         XCTAssertNil(state.currentPaceSecondsPerKm)
     }
 
+    // MARK: - Tendencia de ritmo
+
+    func testPaceTrendIsStableWithoutEnoughHistory() {
+        let state = RunState()
+        state.ingest(location: LocationSample(latitude: 40.0, longitude: -73.0, timestamp: 0))
+        XCTAssertEqual(state.paceTrend, .stable)
+    }
+
+    func testPaceTrendDetectsWorsening() {
+        let state = RunState(paceWindowSize: 2, trendLookbackSeconds: 60, paceTrendThresholdSecondsPerKm: 10)
+        let step = 0.0009 // ~100m
+
+        // Fase rápida: ~100m cada 20s (~200 seg/km).
+        for i in 0...2 {
+            state.ingest(location: LocationSample(
+                latitude: 40.0 - Double(i) * step,
+                longitude: -73.0,
+                timestamp: Double(i) * 20
+            ))
+        }
+        // Fase lenta: ~100m cada 40s (~400 seg/km), más de 60s después del
+        // inicio de la fase rápida.
+        state.ingest(location: LocationSample(latitude: 40.0 - 3 * step, longitude: -73.0, timestamp: 80))
+        state.ingest(location: LocationSample(latitude: 40.0 - 4 * step, longitude: -73.0, timestamp: 120))
+
+        XCTAssertEqual(state.paceTrend, .worsening)
+    }
+
+    func testPaceTrendDetectsImproving() {
+        let state = RunState(paceWindowSize: 2, trendLookbackSeconds: 60, paceTrendThresholdSecondsPerKm: 10)
+        let step = 0.0009 // ~100m
+
+        // Fase lenta: ~100m cada 40s (~400 seg/km) — simétrico a
+        // testPaceTrendDetectsWorsening, con los roles de rápido/lento
+        // invertidos.
+        for i in 0...2 {
+            state.ingest(location: LocationSample(
+                latitude: 40.0 - Double(i) * step,
+                longitude: -73.0,
+                timestamp: Double(i) * 40
+            ))
+        }
+        // Fase rápida: ~100m cada 20s (~200 seg/km), más de 60s después
+        // del inicio de la fase lenta.
+        state.ingest(location: LocationSample(latitude: 40.0 - 3 * step, longitude: -73.0, timestamp: 100))
+        state.ingest(location: LocationSample(latitude: 40.0 - 4 * step, longitude: -73.0, timestamp: 120))
+
+        XCTAssertEqual(state.paceTrend, .improving)
+    }
+
     // MARK: - Splits
 
     func testNoSplitBeforeReachingThreshold() {
