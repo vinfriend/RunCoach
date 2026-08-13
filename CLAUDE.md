@@ -73,6 +73,25 @@ Ver PROJECT_STATUS.md para el estado fase por fase. El roadmap completo (20
 fases) vive en el prompt original de Vicente y se resume en
 [docs/architecture.md](docs/architecture.md).
 
+## Requisitos permanentes de producto
+
+Decisiones que valen para todo el proyecto de acá en adelante, no solo para
+la fase en la que se originaron. Cualquier trabajo futuro de audio debe
+respetar esto sin que haga falta repetirlo:
+
+- **El Audio Coach nunca se apropia de la sesión de audio de forma
+  permanente.** Durante una carrera, el usuario debe poder escuchar música
+  de Spotify/YouTube Music/Apple Music/cualquier app compatible con iOS con
+  normalidad. RunCoach solo baja el volumen de esa música (ducking) mientras
+  efectivamente está hablando, y se lo devuelve a la normalidad apenas
+  termina — mismo patrón que una app de navegación GPS. Nunca pausa/
+  reanuda otras apps directamente, nunca depende de un SDK específico de
+  proveedor (Spotify, Apple Music, etc.). Implementado en
+  `AudioCoachService` (`RunCoach-iOS/App/Audio/`) — ver
+  [docs/audio-coach.md](docs/audio-coach.md) para el diseño completo y
+  [docs/decisions.md](docs/decisions.md) para el porqué de cada elección de
+  `AVAudioSession`.
+
 ## Secretos
 
 Nunca commitear API keys (OpenAI, Apple, etc.). Usar `.gitignore` existente

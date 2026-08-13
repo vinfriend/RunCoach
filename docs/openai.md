@@ -16,8 +16,10 @@ datos crudos (HR, GPS, ritmo)
    → se arma un CoachEventSummary (resumen estructurado, no las muestras crudas)
    → OpenAICoachClient consulta a OpenAI (async, con timeout)
    → CoachRecommendation (texto breve) o nil si falla cualquier cosa
-   → se reproduce por AudioCoach (AVSpeechSynthesizer) — la recomendación
-     de OpenAI si llegó a tiempo, si no, la frase fija en español de Fase 9-10
+   → se reproduce por AudioCoachService (AVSpeechSynthesizer) — la
+     recomendación de OpenAI si llegó a tiempo, si no, la frase fija en
+     español de Fase 9-10 (ver docs/audio-coach.md para el manejo de
+     sesión de audio y convivencia con música de otras apps)
 ```
 
 **No se envía cada muestra a OpenAI.** El volumen de llamadas está acotado

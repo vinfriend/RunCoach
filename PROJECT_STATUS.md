@@ -16,7 +16,9 @@
   CI. `HeartRateMeasurementParser` testeado en Windows.
 - **8**: modo real (BLE+GPS con `Date` de referencia compartido) conectado
   a la UI.
-- **9**: `AudioCoach` (voz `es-AR`) anuncia eventos mecánicos.
+- **9**: `AudioCoachService` (voz `es-AR`) anuncia eventos mecánicos —
+  rediseñado post-Fase 19 para convivir con música de otras apps, ver más
+  abajo.
 - **10**: `CoachDecisionEngine` — la pieza central, decide cuándo hablar.
 - **11**: integración con OpenAI (armado/parseo portable, cliente real
   con timeout/retry). Sin API key configurada todavía.
@@ -69,6 +71,35 @@ cada una.
   con el resto del módulo), force-unwraps existentes revisados y
   confirmados seguros (`CBCentralManager!` idiomático,
   `URL(string:)!` sobre literal constante).
+
+**Requisito permanente (2026-08-12) — Audio Coach convive con música de
+otras apps**. Vicente estableció como requisito permanente del producto
+(no de una fase) que la música de Spotify/YouTube Music/Apple Music/etc.
+siga sonando normalmente durante la carrera, con el coach bajándole el
+volumen (ducking) solo mientras habla — patrón de app de navegación GPS.
+Ver [docs/audio-coach.md](docs/audio-coach.md) para el diseño completo
+(fuentes de documentación de Apple consultadas) y
+[docs/decisions.md](docs/decisions.md) para el detalle de la decisión.
+
+- `AudioCoach` (Fase 9) renombrado y reescrito como `AudioCoachService`:
+  la sesión de audio (`.playback` + `.voicePrompt` + `.duckOthers`) se
+  activa justo antes de cada frase y se desactiva explícitamente al
+  terminar (`notifyOthersOnDeactivation`), en vez de quedar activa para
+  siempre como en el diseño original de Fase 9.
+- **Bug real de diseño encontrado en Fase 9** (nunca se había podido
+  escuchar, sin Mac/iPhone): `AVSpeechSynthesizer` activa la sesión de
+  audio solo pero no la desactiva sola — con el diseño original, la
+  música de otras apps hubiera quedado "duckeada" para siempre después de
+  la primera frase del coach.
+- `CoachMessage` (nuevo, `App/Audio/`): tipo mínimo que envuelve el texto,
+  frontera explícita entre evento y audio.
+- Maneja interrupciones (llamada/Siri/alarma) y cambios de ruta (AirPods)
+  sin mantener estado especial de recuperación.
+- Sin cambios en `RunCoachCore` — sigue en 93 tests, 0 fallas. Todo lo
+  nuevo es exclusivo de `AVAudioSession`/`AVSpeechSynthesizer` (Apple), sin
+  forma de testear ni compilar en Windows.
+- **Sin validar con hardware real** — checklist de 8 escenarios de prueba
+  manual en `docs/audio-coach.md`, pendiente de iPhone físico (Fase 13+).
 
 ## Último commit estable
 
@@ -210,6 +241,11 @@ Ver [docs/decisions.md](docs/decisions.md) para el detalle y motivos:
 26. `RunFormatting` compartido entre `RunView`/`HistoryView`/
     `RunDetailView` — corrige una inconsistencia real de formateo de
     ritmo encontrada en la revisión de calidad post-Fase 19.
+27. **Convivencia con música de otras apps es requisito permanente del
+    producto** (no de una fase): `AudioCoach` → `AudioCoachService`, sesión
+    de audio activada/desactivada alrededor de cada frase
+    (`.voicePrompt` + `.duckOthers`, no de forma permanente como en el
+    diseño original de Fase 9) — ver docs/audio-coach.md.
 
 ## Arquitectura
 
@@ -269,6 +305,16 @@ RunCoach-iOS/App/Views/RunView.swift                                    (modific
 RunCoach-iOS/App/Formatting/RunFormatting.swift                         (nuevo)
 ```
 
+## Archivos creados/modificados (Audio Coach — requisito permanente)
+
+```
+RunCoach-iOS/App/Audio/AudioCoach.swift                                 (eliminado, reemplazado)
+RunCoach-iOS/App/Audio/AudioCoachService.swift                          (nuevo)
+RunCoach-iOS/App/Audio/CoachMessage.swift                               (nuevo)
+RunCoach-iOS/App/ViewModels/RunSessionViewModel.swift                   (modificado: usa CoachMessage)
+docs/audio-coach.md                                                     (nuevo)
+```
+
 ## Git
 
 Repo en GitHub: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/RunCoach),
@@ -277,7 +323,8 @@ Repo en GitHub: [github.com/vinfriend/RunCoach](https://github.com/vinfriend/Run
 ## Próxima tarea
 
 Con el trabajo post-Fase 19 (Coach Decision Engine ampliado, detalle de
-carrera, revisión de calidad) completado y commiteado, no hay más fases
+carrera, revisión de calidad, y el requisito permanente de convivencia de
+audio con música de otras apps) completado y commiteado, no hay más fases
 avanzables sin firma/hardware según el roadmap original. Opciones para
 cuando Vicente quiera seguir:
 

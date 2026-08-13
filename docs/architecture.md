@@ -233,17 +233,43 @@ Fase 14.
 
 **Implementado (Fase 9 — Audio Coach):**
 
-`AudioCoach` (`App/Audio/`) envuelve `AVSpeechSynthesizer` con voz en
-español (`es-AR` por defecto) y una `AVAudioSession` configurada como
-`.playback` + `.spokenAudio` con `.duckOthers` — pensada para sonar aunque
-el iPhone esté en silencio, bajando (no cortando) otro audio que esté
-sonando. **Es solo infraestructura de voz: no decide nada.**
-`RunSessionViewModel` la usa para anunciar eventos mecánicos que
-`RunCoachCore` ya calcula — inicio/fin de carrera, cada split completado
-con su ritmo — sin ninguna lógica de "¿vale la pena hablar ahora?".
+`AudioCoachService` (`App/Audio/`, renombrado desde `AudioCoach` en el
+trabajo post-Fase 19 descrito abajo) envuelve `AVSpeechSynthesizer` con voz
+en español (`es-AR` por defecto). **Es solo infraestructura de voz: no
+decide nada.** `RunSessionViewModel` la usa para anunciar eventos mecánicos
+que `RunCoachCore` ya calcula — inicio/fin de carrera, cada split
+completado con su ritmo — sin ninguna lógica de "¿vale la pena hablar
+ahora?".
 
 A diferencia de BLE, el simulador de iOS sí reproduce audio — pero sin Mac
 para abrir Xcode, sigue sin poder escucharse ni validarse de este lado.
+
+**Post-Fase 19 — convivencia con música de otras apps (requisito
+permanente del producto):** Vicente pidió explícitamente que la música de
+Spotify/YouTube Music/Apple Music/etc. siga sonando normalmente durante la
+carrera, con el coach bajándole el volumen (ducking) solo mientras habla —
+el mismo patrón que usan las apps de navegación GPS. Ver
+[docs/audio-coach.md](audio-coach.md) para el diseño completo (categoría/
+modo/opciones de `AVAudioSession`, manejo de interrupciones y AirPods,
+checklist de pruebas reales) y [docs/decisions.md](decisions.md) para las
+fuentes de documentación de Apple consultadas. Resumen:
+
+- Categoría `.playback`, modo `.voicePrompt`, opción `.duckOthers` — la
+  sesión se activa justo antes de cada frase y se desactiva apenas termina
+  (`setActive(false, options: .notifyOthersOnDeactivation)`), no de forma
+  permanente. Necesario porque `AVSpeechSynthesizer` activa la sesión solo
+  pero no la desactiva sola (comportamiento documentado de Apple).
+- `CoachMessage` (`App/Audio/`, nuevo): tipo mínimo que envuelve el texto
+  ya armado en español — la frontera explícita entre "qué evento pasó"
+  (`CoachEvent`, RunCoachCore) y "cómo se dice y se reproduce"
+  (`AudioCoachService`).
+- Maneja `AVAudioSession.interruptionNotification` (llamadas, Siri,
+  alarmas) y `AVAudioSession.routeChangeNotification` (AirPods) sin
+  mantener estado especial de "recuperación" — como la sesión nunca queda
+  activa de forma permanente, el próximo evento real del coach simplemente
+  la reactiva desde cero.
+- El Run Data Engine (`RunState`, GPS, FC) nunca depende del audio: toda
+  llamada a `AVAudioSession`/`AVSpeechSynthesizer` está envuelta en `try?`.
 
 **Implementado (Fase 10 — Coach Decision Engine):**
 
@@ -255,8 +281,8 @@ bug real encontrado y corregido durante la implementación.
 
 `RunSessionViewModel` consulta `CoachDecisionEngine` en cada `refresh()` y,
 cuando decide `.speak(event)`, traduce el `CoachEvent` a español y se lo
-pasa a `AudioCoach` — el mismo mecanismo de Fase 9, ahora con criterio real
-detrás en vez de solo eventos mecánicos.
+pasa a `AudioCoachService` — el mismo mecanismo de Fase 9, ahora con
+criterio real detrás en vez de solo eventos mecánicos.
 
 Como no hay Mac local, todo el código de `RunCoach-iOS` (incluyendo esta
 integración) solo se valida por CI (compila para simulador) — nunca se vio

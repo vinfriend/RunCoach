@@ -93,3 +93,14 @@ cubriendo:
 Explícitamente sin cubrir todavía (fases futuras): UI/integración iOS
 (Fases 4-9, solo validadas por compilación en CI — ver PROJECT_STATUS.md),
 pruebas con hardware real (Fases 14-18).
+
+## Audio Coach: convivencia con música de otras apps (requisito permanente)
+
+Ver [docs/audio-coach.md](audio-coach.md) para el diseño completo. Es
+lógica exclusiva de `AVAudioSession`/`AVSpeechSynthesizer` (Apple), así que
+no agrega tests a `RunCoachCore` — sigue en 93 tests, sin cambios por este
+trabajo. La validación real vive en la checklist de 8 escenarios de
+`docs/audio-coach.md` (Spotify/YouTube Music/Apple Music, AirPods
+conectados/desconectados, interrupciones, pantalla bloqueada, varias
+intervenciones seguidas), pendiente de hardware real — mismo estado que el
+resto de BLE/GPS/Audio.

@@ -602,3 +602,77 @@ presentación en `RunCoach-iOS`, fuera del alcance de esos tests.
 **Impacto**: sin funcionalidad nueva, como correspondía al alcance pedido
 — es un cambio puramente interno, mismo comportamiento visible salvo por
 la inconsistencia corregida.
+
+---
+
+## 2026-08-12 — Requisito permanente: convivencia con música de otras apps (audio ducking, no interrupción)
+
+**Decisión**: Vicente estableció como **requisito permanente del producto**
+(no de una fase puntual) que durante una carrera la música de Spotify/
+YouTube Music/Apple Music/etc. debe poder escucharse con normalidad, y que
+RunCoach solo debe bajarle el volumen (ducking) mientras el coach
+efectivamente está hablando — nunca pausarla/reanudarla directamente ni
+apropiarse de la sesión de audio de forma permanente. El patrón deseado es
+el mismo que usan las apps de navegación GPS.
+
+`AudioCoach` (Fase 9) se renombra a `AudioCoachService` y se reescribe:
+
+- `AVAudioSession` pasa de `.playback` + `.spokenAudio` + `.duckOthers`
+  (Fase 9 original) a `.playback` + `.voicePrompt` + `.duckOthers` —
+  `.voicePrompt` es el modo que Apple documenta específicamente para esto.
+- La sesión se activa justo antes de cada frase y se **desactiva
+  explícitamente** al terminar (`setActive(false, options:
+  .notifyOthersOnDeactivation)`), en vez de activarse una sola vez en
+  `init()` y quedar activa para siempre (comportamiento de Fase 9
+  original).
+- Nuevo tipo `CoachMessage` como frontera explícita entre "evento" y
+  "audio".
+
+**Motivo — el hallazgo clave de la investigación**: se confirmó (Apple
+Developer Forums, contrastado contra el comportamiento documentado de
+`AVSpeechSynthesizer`) que el synthesizer activa la sesión de audio por su
+cuenta pero **no la desactiva sola**. El diseño original de Fase 9
+activaba la sesión una vez en `init()` y nunca la desactivaba — en la
+práctica, eso significa que apenas sonara la primera frase, la música de
+Spotify/Apple Music quedaría "duckeada" (volumen bajo) el resto de la
+carrera, nunca recuperando su volumen normal. Es un bug de diseño real de
+Fase 9 que no se había notado porque nunca hubo forma de escucharlo (sin
+Mac, sin iPhone). El nuevo diseño evita esto llevando la cuenta de frases
+pendientes (`pendingUtterances`) y desactivando la sesión solo cuando llega
+a cero.
+
+**Por qué `.voicePrompt` y no `.spokenAudio`**: `.spokenAudio` (usado en
+Fase 9) está pensado para audio hablado *continuo* (podcasts, audiolibros)
+que se pausa ante avisos cortos de otras apps — el caso inverso al
+nuestro. `.voicePrompt` es el modo que Apple documenta para apps que
+*interrumpen brevemente* audio de otras apps con texto a voz — exactamente
+nuestro caso (avisos cortos sobre música ajena).
+
+**Por qué NO `.interruptSpokenAudioAndMixWithOthers`**: esa opción (parte
+de la guía de Apple para apps de navegación en CarPlay) *pausa* contenido
+hablado de otras apps en vez de solo bajarle el volumen — Vicente pidió
+explícitamente evitar interrumpir salvo razón técnica fuerte, y como el
+caso de uso principal es música (no podcasts de otras apps), `.duckOthers`
+solo alcanza sin necesidad de esa opción más invasiva.
+
+**Alcance de la investigación**: se consultó la documentación oficial de
+Apple para `AVAudioSession.Mode.voicePrompt` y
+`AVAudioSession.CategoryOptions.duckOthers` antes de implementar, tal como
+Vicente pidió explícitamente ("no asumas cuál combinación es correcta").
+Ver [docs/audio-coach.md](audio-coach.md) para las fuentes completas y el
+detalle de diseño (interrupciones, AirPods, checklist de pruebas reales).
+
+**Impacto**: acotado a `RunCoach-iOS/App/Audio/` y al único punto de
+contacto en `RunSessionViewModel` (llamadas a `audioCoach.speak(...)`, que
+ahora reciben un `CoachMessage` en vez de un `String` crudo).
+`RunCoachCore` no se modificó — el Run Data Engine y el Coach Decision
+Engine siguen exactamente igual, sin ninguna dependencia del estado del
+audio. Sin forma de validar el comportamiento real (ducking, AirPods,
+interrupciones) sin un iPhone físico — queda como checklist explícita en
+`docs/audio-coach.md`, no como algo confirmado.
+
+**Alternativas consideradas**: pausar/reanudar directamente las apps de
+música (Spotify, Apple Music) — descartado por instrucción explícita de
+Vicente, que además introduciría dependencias específicas de proveedor
+(rompiendo la genericidad deseada: "cualquier app de audio compatible con
+iOS").

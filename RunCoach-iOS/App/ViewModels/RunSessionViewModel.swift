@@ -28,7 +28,7 @@ enum RunMode: Equatable {
 /// entregando.
 ///
 /// **Audio (Fase 9)**: anuncia inicio/fin de carrera y cada split
-/// completado por `AudioCoach`. Son anuncios mecánicos atados a eventos
+/// completado por `AudioCoachService`. Son anuncios mecánicos atados a eventos
 /// concretos que `RunCoachCore` ya calcula — no hay ninguna decisión de
 /// "¿vale la pena hablar ahora?" en esa parte.
 ///
@@ -68,7 +68,7 @@ final class RunSessionViewModel: ObservableObject {
     private var runState = RunState()
     private var coachDecisionEngine = CoachDecisionEngine()
     private var pendingWorkItems: [DispatchWorkItem] = []
-    private let audioCoach = AudioCoach()
+    private let audioCoach = AudioCoachService()
     private let openAIClient = OpenAICoachClient()
     private let historyStore = RunHistoryStore.documentsStore()
     private var runStartedAt: Date?
@@ -90,7 +90,7 @@ final class RunSessionViewModel: ObservableObject {
         runState = RunState()
         coachDecisionEngine = CoachDecisionEngine()
         runStartedAt = Date()
-        audioCoach.speak("Carrera simulada iniciada.")
+        audioCoach.speak(CoachMessage(text: "Carrera simulada iniciada."))
 
         let heartRateSamples = ScenarioSimulator.generateHeartRateSamples(for: scenario)
         let locationSamples = ScenarioSimulator.generateLocationSamples(
@@ -115,7 +115,7 @@ final class RunSessionViewModel: ObservableObject {
         runState = RunState()
         coachDecisionEngine = CoachDecisionEngine()
         runStartedAt = Date()
-        audioCoach.speak("Carrera iniciada.")
+        audioCoach.speak(CoachMessage(text: "Carrera iniciada."))
 
         // Mismo Date de referencia para ambas fuentes — ver el comentario
         // de la clase y docs/decisions.md (nota pendiente desde Fase 6).
@@ -163,7 +163,7 @@ final class RunSessionViewModel: ObservableObject {
         mode = nil
 
         if wasRunning {
-            audioCoach.speak("Carrera detenida.")
+            audioCoach.speak(CoachMessage(text: "Carrera detenida."))
         }
     }
 
@@ -207,7 +207,7 @@ final class RunSessionViewModel: ObservableObject {
             guard let self else { return }
             self.finishRun()
             self.isRunning = false
-            self.audioCoach.speak("Carrera simulada finalizada.")
+            self.audioCoach.speak(CoachMessage(text: "Carrera simulada finalizada."))
         }
         pendingWorkItems.append(item)
         // Un pequeño margen extra para que la última muestra ya se haya
@@ -245,9 +245,9 @@ final class RunSessionViewModel: ObservableObject {
         Task { [weak self] in
             guard let self else { return }
             if let recommendation = await self.openAIClient.recommendation(for: summary) {
-                self.audioCoach.speak(recommendation.message)
+                self.audioCoach.speak(CoachMessage(text: recommendation.message))
             } else {
-                self.audioCoach.speak(fallbackText)
+                self.audioCoach.speak(CoachMessage(text: fallbackText))
             }
         }
     }
@@ -258,7 +258,7 @@ final class RunSessionViewModel: ObservableObject {
     /// no es el Coach Decision Engine.
     private func announceSplit(_ split: Split) {
         let km = split.index + 1
-        audioCoach.speak("Kilómetro \(km). Ritmo: \(spokenPace(split.averagePaceSecondsPerKm)).")
+        audioCoach.speak(CoachMessage(text: "Kilómetro \(km). Ritmo: \(spokenPace(split.averagePaceSecondsPerKm))."))
     }
 
     /// Traduce un `CoachEvent` (RunCoachCore, sin idioma) a una frase en
