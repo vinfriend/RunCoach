@@ -1,7 +1,8 @@
 # RunCoach
 
-Coach inteligente de running en tiempo real para iPhone + AirPods + pulsera
-BLE de frecuencia cardíaca (sin pantalla, sin Apple Watch).
+Coach inteligente de running en tiempo real para iPhone + auriculares/salida
+de audio compatible con iOS + pulsera BLE de frecuencia cardíaca (sin
+pantalla, sin Apple Watch).
 
 > Proyecto personal de Vicente. No es software médico: no diagnostica, solo
 > ofrece coaching deportivo prudente.
@@ -13,7 +14,7 @@ Pulsera BLE (HR) ─┐
                    ├─► iPhone (GPS, tiempo, ritmo) ─► RunCoachCore
                    │      (procesa localmente, decide si algo es
                    │       relevante, consulta OpenAI solo si hace falta)
-                   └────────────────────────────────► AirPods (voz)
+                   └───────────────► Salida de audio activa de iOS (voz)
 ```
 
 Detalle completo en [docs/architecture.md](docs/architecture.md).

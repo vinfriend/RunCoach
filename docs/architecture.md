@@ -33,8 +33,13 @@
                                           └────────────┬────────────┘
                                                         │ AVSpeechSynthesizer
                                                         ▼
-                                                    AirPods
+                                        Salida de audio activa (iOS)
 ```
+
+La última flecha es a propósito genérica: `RunCoach` nunca habla
+directamente "hacia AirPods" — habla hacia `AVAudioSession`, y es iOS quien
+decide y gestiona qué salida física está activa en cada momento (AirPods,
+otro Bluetooth, cable, altavoz). Ver [docs/audio-coach.md](audio-coach.md).
 
 ## Principio central
 
@@ -184,7 +189,8 @@ Todo lo específico de Apple:
 - SwiftUI (UI de carrera, configuración, historial).
 - CoreBluetooth (`BLEHeartRateSource`, descubrimiento/conexión/reconexión).
 - CoreLocation (GPS en background, `allowsBackgroundLocationUpdates`).
-- AVFoundation / `AVSpeechSynthesizer` (audio coach por AirPods).
+- AVFoundation / `AVSpeechSynthesizer` (audio coach por la salida de audio
+  activa que iOS tenga en cada momento — AirPods u otra compatible).
 - Background modes (`bluetooth-central`, `location`, `audio`).
 - Keychain (guardar la API key de OpenAI de forma segura, nunca en texto
   plano ni en Git).
@@ -250,9 +256,9 @@ Spotify/YouTube Music/Apple Music/etc. siga sonando normalmente durante la
 carrera, con el coach bajándole el volumen (ducking) solo mientras habla —
 el mismo patrón que usan las apps de navegación GPS. Ver
 [docs/audio-coach.md](audio-coach.md) para el diseño completo (categoría/
-modo/opciones de `AVAudioSession`, manejo de interrupciones y AirPods,
-checklist de pruebas reales) y [docs/decisions.md](decisions.md) para las
-fuentes de documentación de Apple consultadas. Resumen:
+modo/opciones de `AVAudioSession`, manejo de interrupciones y cambios de
+ruta de audio, checklist de pruebas reales) y [docs/decisions.md](decisions.md)
+para las fuentes de documentación de Apple consultadas. Resumen:
 
 - Categoría `.playback`, modo `.voicePrompt`, opción `.duckOthers` — la
   sesión se activa justo antes de cada frase y se desactiva apenas termina
@@ -264,10 +270,17 @@ fuentes de documentación de Apple consultadas. Resumen:
   (`CoachEvent`, RunCoachCore) y "cómo se dice y se reproduce"
   (`AudioCoachService`).
 - Maneja `AVAudioSession.interruptionNotification` (llamadas, Siri,
-  alarmas) y `AVAudioSession.routeChangeNotification` (AirPods) sin
-  mantener estado especial de "recuperación" — como la sesión nunca queda
-  activa de forma permanente, el próximo evento real del coach simplemente
-  la reactiva desde cero.
+  alarmas) y `AVAudioSession.routeChangeNotification` (conectar/
+  desconectar/cambiar de auriculares o parlante Bluetooth, pasar al
+  altavoz, etc.) sin mantener estado especial de "recuperación" — como la
+  sesión nunca queda activa de forma permanente, el próximo evento real
+  del coach simplemente la reactiva desde cero, usando la ruta que iOS
+  tenga activa en ese momento.
+- **Sin dependencia de AirPods ni de ninguna marca/modelo de auricular**:
+  `AudioCoachService` solo habla contra `AVAudioSession`, nunca contra un
+  dispositivo específico — `RunCoach → AVAudioSession → ruta activa de
+  iOS`, no `RunCoach → AirPods`. Requisito permanente del producto,
+  registrado el 2026-08-12 — ver docs/decisions.md.
 - El Run Data Engine (`RunState`, GPS, FC) nunca depende del audio: toda
   llamada a `AVAudioSession`/`AVSpeechSynthesizer` está envuelta en `try?`.
 

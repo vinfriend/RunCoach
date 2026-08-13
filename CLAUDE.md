@@ -8,9 +8,11 @@ de tocar código.
 
 RunCoach: app iOS de coaching de running en tiempo real. Pulsera/sensor BLE
 (sin pantalla) para frecuencia cardíaca + iPhone para GPS/tiempo/ritmo +
-AirPods para audio. Procesamiento local de métricas, decisión prudente de
-cuándo hablar, y consulta a OpenAI solo para eventos relevantes. No es
-software médico: no diagnostica, solo hace coaching deportivo.
+la salida de audio activa que iOS tenga en cada momento (AirPods u otra
+compatible) para el audio. Procesamiento local de métricas, decisión
+prudente de cuándo hablar, y consulta a OpenAI solo para eventos
+relevantes. No es software médico: no diagnostica, solo hace coaching
+deportivo.
 
 ## Antes de empezar cualquier sesión
 
@@ -91,6 +93,18 @@ respetar esto sin que haga falta repetirlo:
   [docs/audio-coach.md](docs/audio-coach.md) para el diseño completo y
   [docs/decisions.md](docs/decisions.md) para el porqué de cada elección de
   `AVAudioSession`.
+- **RunCoach no depende de AirPods ni de ninguna marca/modelo de
+  auricular específico.** La arquitectura es `RunCoach → AVAudioSession →
+  ruta de audio activa administrada por iOS`, nunca `RunCoach → AirPods`.
+  Debe funcionar igual con AirPods, auriculares Bluetooth de cualquier
+  marca, auriculares con cable, parlantes Bluetooth, o el altavoz del
+  propio iPhone si no hay nada conectado — sin lógica específica de
+  hardware salvo que exista una limitación técnica concreta que lo
+  justifique. Cambios de ruta (conectar/desconectar/cambiar de
+  dispositivo) no deben detener la carrera, el GPS, la frecuencia
+  cardíaca, el Run Data Engine ni el Coach Decision Engine. AirPods puede
+  aparecer como *caso de prueba* en la documentación, nunca como
+  dependencia del producto.
 
 ## Secretos
 

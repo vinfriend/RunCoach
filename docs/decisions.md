@@ -660,19 +660,70 @@ Apple para `AVAudioSession.Mode.voicePrompt` y
 `AVAudioSession.CategoryOptions.duckOthers` antes de implementar, tal como
 Vicente pidió explícitamente ("no asumas cuál combinación es correcta").
 Ver [docs/audio-coach.md](audio-coach.md) para las fuentes completas y el
-detalle de diseño (interrupciones, AirPods, checklist de pruebas reales).
+detalle de diseño (interrupciones, cambios de ruta de audio, checklist de
+pruebas reales).
 
 **Impacto**: acotado a `RunCoach-iOS/App/Audio/` y al único punto de
 contacto en `RunSessionViewModel` (llamadas a `audioCoach.speak(...)`, que
 ahora reciben un `CoachMessage` en vez de un `String` crudo).
 `RunCoachCore` no se modificó — el Run Data Engine y el Coach Decision
 Engine siguen exactamente igual, sin ninguna dependencia del estado del
-audio. Sin forma de validar el comportamiento real (ducking, AirPods,
-interrupciones) sin un iPhone físico — queda como checklist explícita en
-`docs/audio-coach.md`, no como algo confirmado.
+audio. Sin forma de validar el comportamiento real (ducking, cambios de
+ruta de audio, interrupciones) sin un iPhone físico — queda como checklist
+explícita en `docs/audio-coach.md`, no como algo confirmado.
 
 **Alternativas consideradas**: pausar/reanudar directamente las apps de
 música (Spotify, Apple Music) — descartado por instrucción explícita de
 Vicente, que además introduciría dependencias específicas de proveedor
 (rompiendo la genericidad deseada: "cualquier app de audio compatible con
 iOS").
+
+---
+
+## 2026-08-12 — Requisito permanente: salida de audio genérica, no AirPods
+
+**Decisión**: Vicente estableció como requisito permanente adicional que
+RunCoach **no dependa de AirPods** ni de ninguna marca/modelo de auricular
+específico — debe funcionar con cualquier salida de audio que iOS tenga
+activa (AirPods, Bluetooth de otra marca, cable, parlante Bluetooth,
+altavoz del iPhone). Principio de diseño explícito: la arquitectura es
+`RunCoach → AVAudioSession → ruta de audio activa administrada por iOS`,
+nunca `RunCoach → AirPods`.
+
+**Hallazgo de la revisión de código**: al inspeccionar `AudioCoachService`
+(recién escrito en la decisión anterior) antes de tocar nada, se confirmó
+que **la arquitectura ya cumplía esto por completo** — nunca importa
+`CoreBluetooth`, nunca chequea nombre/tipo/marca de dispositivo, y trabaja
+exclusivamente contra `AVAudioSession`/`AVSpeechSynthesizer`, dejando que
+iOS decida y gestione la ruta activa. `AVAudioSession.routeChangeNotification`
+ya se escuchaba de forma genérica (sin reaccionar a un dispositivo en
+particular). Es decir: **el código no necesitó ningún cambio de
+comportamiento** — la única desviación real estaba en la documentación
+(README.md, CLAUDE.md, el diagrama de `docs/architecture.md`), que
+mencionaba "AirPods" como si fuera parte fija del stack del producto en
+vez de un ejemplo entre varias salidas posibles.
+
+**Por qué no hubo refactor**: siguiendo la instrucción explícita de
+Vicente ("si la arquitectura ya es genérica y solo requiere
+documentación/tests, no hagas refactor innecesario"), el único cambio de
+código fue cosmético — comentarios de `AudioCoachService.swift`
+actualizados para nombrar explícitamente los casos de
+`AVAudioSession.RouteChangeReason` considerados, sin agregar lógica nueva
+(ninguno de esos motivos requiere una acción manual de la app en este
+diseño).
+
+**Impacto**: puramente documental — se generalizó el lenguaje en
+README.md, CLAUDE.md, docs/architecture.md, docs/audio-coach.md,
+docs/testing.md y PROJECT_STATUS.md, reemplazando menciones de AirPods
+como requisito por "salida de audio activa gestionada por iOS", dejando
+AirPods únicamente como uno de varios casos de prueba. Se amplió la
+checklist de pruebas reales en `docs/audio-coach.md` con escenarios A-J
+que cubren explícitamente auriculares de otras marcas, cable, parlante
+Bluetooth, y "sin nada conectado" — para que la ausencia de dependencia de
+AirPods quede como algo que se prueba, no solo se declara. Sin cambios en
+`RunCoachCore` (sigue en 93 tests, 0 fallas) ni en el comportamiento de
+`AudioCoachService`.
+
+**Alternativas consideradas**: ninguna — al confirmar que el código ya
+cumplía el requisito, la única decisión real fue de alcance (documentación
++ checklist, no refactor), no de diseño técnico.

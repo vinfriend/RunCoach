@@ -1,13 +1,19 @@
 import AVFoundation
 
 /// Envuelve `AVSpeechSynthesizer` para que la app pueda "hablar" texto
-/// simple por la salida de audio activa (AirPods u otra), sin apropiarse
-/// de la sesión de audio más allá de lo que dura cada mensaje — así el
-/// usuario puede escuchar música de Spotify/YouTube Music/Apple Music/etc.
-/// normalmente mientras corre, y solo baja de volumen (duck) el instante
-/// en que el coach tiene algo que decir. Es un requisito permanente del
-/// producto (no de una fase puntual) — ver [docs/audio-coach.md](../../../docs/audio-coach.md)
-/// y [docs/decisions.md](../../../docs/decisions.md) para el diseño completo
+/// simple por la ruta de audio activa que iOS tenga en cada momento —
+/// AirPods, otro Bluetooth, cable, o el altavoz del iPhone si no hay nada
+/// conectado — sin apropiarse de la sesión de audio más allá de lo que
+/// dura cada mensaje. Así el usuario puede escuchar música de Spotify/
+/// YouTube Music/Apple Music/etc. normalmente mientras corre, y solo baja
+/// de volumen (duck) el instante en que el coach tiene algo que decir.
+///
+/// **A propósito nunca controla ni asume un dispositivo de audio
+/// específico**: la arquitectura es `AudioCoachService → AVAudioSession →
+/// ruta activa de iOS`, no `AudioCoachService → AirPods`. Dos requisitos
+/// permanentes del producto (no de una fase puntual) — ver
+/// [docs/audio-coach.md](../../../docs/audio-coach.md) y
+/// [docs/decisions.md](../../../docs/decisions.md) para el diseño completo
 /// y las fuentes de la documentación de Apple consultadas.
 ///
 /// **`AudioCoachService` no decide nada**: recibe un `CoachMessage` ya
@@ -123,11 +129,18 @@ final class AudioCoachService: NSObject {
         pendingUtterances = 0
     }
 
-    /// Cambios de ruta (conectar/desconectar AirPods, por ejemplo) los
-    /// resuelve iOS solo — `AVSpeechSynthesizer` sigue hablando por la
-    /// salida activa que el sistema elija. No hace falta ninguna acción
-    /// nuestra; el handler existe para dejar documentado que el caso se
-    /// consideró, no porque haga algo hoy.
+    /// Cambios de ruta — conectar/desconectar auriculares Bluetooth de
+    /// cualquier marca (no solo AirPods), un parlante Bluetooth, cable, o
+    /// pasar al altavoz — los resuelve iOS solo. Se evaluaron los motivos
+    /// que expone `AVAudioSession.RouteChangeReason`
+    /// (`.newDeviceAvailable`, `.oldDeviceUnavailable`, `.categoryChange`,
+    /// `.override`, `.wakeFromSleep`, `.noSuitableRouteForCategory`,
+    /// `.routeConfigurationChange`) y ninguno requiere una acción manual
+    /// acá: `AVSpeechSynthesizer` sigue hablando por la salida activa que
+    /// el sistema elija, sin que esta clase intervenga en el enrutamiento
+    /// ni asuma qué dispositivo está conectado. El handler existe para
+    /// dejar documentado que el caso se consideró, no porque haga algo
+    /// hoy — ver docs/audio-coach.md para el detalle de cada motivo.
     @objc private func handleRouteChange(_ notification: Notification) {}
 }
 

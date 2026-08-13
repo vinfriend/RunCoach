@@ -17,7 +17,8 @@
 - **8**: modo real (BLE+GPS con `Date` de referencia compartido) conectado
   a la UI.
 - **9**: `AudioCoachService` (voz `es-AR`) anuncia eventos mecánicos —
-  rediseñado post-Fase 19 para convivir con música de otras apps, ver más
+  rediseñado post-Fase 19 para convivir con música de otras apps y para
+  no depender de AirPods (cualquier salida de audio de iOS), ver más
   abajo.
 - **10**: `CoachDecisionEngine` — la pieza central, decide cuándo hablar.
 - **11**: integración con OpenAI (armado/parseo portable, cliente real
@@ -93,13 +94,41 @@ Ver [docs/audio-coach.md](docs/audio-coach.md) para el diseño completo
   la primera frase del coach.
 - `CoachMessage` (nuevo, `App/Audio/`): tipo mínimo que envuelve el texto,
   frontera explícita entre evento y audio.
-- Maneja interrupciones (llamada/Siri/alarma) y cambios de ruta (AirPods)
-  sin mantener estado especial de recuperación.
+- Maneja interrupciones (llamada/Siri/alarma) y cambios de ruta (conectar/
+  desconectar/cambiar de auriculares, altavoz, etc.) sin mantener estado
+  especial de recuperación.
 - Sin cambios en `RunCoachCore` — sigue en 93 tests, 0 fallas. Todo lo
   nuevo es exclusivo de `AVAudioSession`/`AVSpeechSynthesizer` (Apple), sin
   forma de testear ni compilar en Windows.
-- **Sin validar con hardware real** — checklist de 8 escenarios de prueba
-  manual en `docs/audio-coach.md`, pendiente de iPhone físico (Fase 13+).
+- **Sin validar con hardware real** — checklist de prueba manual en
+  `docs/audio-coach.md`, pendiente de iPhone físico (Fase 13+).
+
+**Requisito permanente (2026-08-12) — Salida de audio genérica, no
+AirPods**. Vicente pidió confirmar que RunCoach no depende de AirPods —
+debe funcionar con cualquier salida de audio que iOS tenga activa
+(Bluetooth de cualquier marca, cable, parlante Bluetooth, altavoz del
+iPhone). Ver [docs/audio-coach.md](docs/audio-coach.md) y
+[docs/decisions.md](docs/decisions.md).
+
+- **Revisión de código, no refactor**: al inspeccionar `AudioCoachService`
+  (recién escrito) se confirmó que **ya cumplía esto por completo** — nunca
+  importa `CoreBluetooth`, nunca chequea marca/modelo de dispositivo,
+  trabaja exclusivamente contra `AVAudioSession` y deja que iOS decida la
+  ruta. Sin cambios de comportamiento.
+- El único trabajo real fue **documental**: README.md, CLAUDE.md,
+  docs/architecture.md, docs/audio-coach.md, docs/testing.md trataban a
+  AirPods como si fuera parte fija del stack — se generalizó a "salida de
+  audio activa gestionada por iOS", con AirPods como un caso de prueba más,
+  no como dependencia.
+- Checklist de `docs/audio-coach.md` ampliada con 10 escenarios (A-J):
+  AirPods, auriculares Bluetooth de otra marca, altavoz del iPhone,
+  desconexión/reconexión en plena carrera, cambio entre dos salidas
+  Bluetooth, Spotify/YouTube Music con auriculares genéricos, cambio de
+  ruta durante una intervención del coach, y sin nada conectado.
+- Ajuste cosmético de comentarios en `AudioCoachService.swift` (sin lógica
+  nueva) para nombrar explícitamente los motivos de
+  `AVAudioSession.RouteChangeReason` considerados.
+- Sin cambios en `RunCoachCore` — sigue en 93 tests, 0 fallas.
 
 ## Último commit estable
 
@@ -246,6 +275,11 @@ Ver [docs/decisions.md](docs/decisions.md) para el detalle y motivos:
     de audio activada/desactivada alrededor de cada frase
     (`.voicePrompt` + `.duckOthers`, no de forma permanente como en el
     diseño original de Fase 9) — ver docs/audio-coach.md.
+28. **Salida de audio genérica es requisito permanente del producto**: no
+    AirPods, sino `AudioCoachService → AVAudioSession → ruta activa de
+    iOS`. El código ya cumplía esto (sin cambios); el trabajo fue
+    generalizar documentación que trataba a AirPods como dependencia fija
+    — ver docs/audio-coach.md y docs/decisions.md.
 
 ## Arquitectura
 
